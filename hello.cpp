@@ -63,6 +63,36 @@ struct PolicyHelper<NullType>
   };
 };
 
+template<class P>
+struct GetP
+{
+  typedef P::Policy Result;
+};
+
+template<>
+struct GetP<int>
+{
+  typedef EmptyType Result;
+};
+
+template<>
+struct GetP<EmptyType>
+{
+  typedef EmptyType Result;
+};
+
+template<class P>
+struct GetN
+{
+  typedef P::Next Result;
+};
+
+template<>
+struct GetN<int>
+{
+  typedef EmptyType Result;
+};
+
 template<class TYPE_LIST>
 struct PolicyHelper
 {
@@ -70,7 +100,9 @@ struct PolicyHelper
   struct Actual
   {
     typedef PolicyHelper<typename TYPE_LIST::Tail>::Actual<ACTUAL> Next;
-    typedef FriendlySpec<typename TYPE_LIST::Head, ACTUAL, Next::Policy >::Result Policy;
+    typedef GetP<Next>::Result np;
+
+    typedef FriendlySpec<typename TYPE_LIST::Head, ACTUAL, np >::Result Policy;
   };
 };
 
@@ -142,13 +174,19 @@ struct Specialize<LowerPolicy>
   };
 };
 
+
 template<class ACTUAL, class TYPE_LIST>
 struct FriendlyPolicyHelper
 {
   typedef PolicyHelper<TYPE_LIST>::Actual<ACTUAL> Helper;
-  typedef Helper::Policy Policy;
-//  typedef Helper::Next Next;
+  //typedef typename Helper::Policy Policy;
+  typedef GetP<Helper>::Result Policy;
+
+  //typedef Helper::Next Next;
+  typedef GetN<Helper>::Result Next;
 };
+
+
 
 template<class UPPER_POLICY, class LOWER_POLICY>
 struct PolicyClass : public 
@@ -165,9 +203,13 @@ struct PolicyClass : public
       TypeList< UPPER_POLICY, TypeList<LOWER_POLICY, NullType> >
     >::Helper Helper;
   
-  typedef Helper::Policy UpperType;
-  typedef Helper::Next::Policy LowerType;
-    
+  
+  //typedef Helper::Policy UpperType;
+  typedef GetP<Helper>::Result UpperType;
+
+  //typedef Helper::Next::Policy LowerType;
+  typedef GetP<GetN<Helper>::Result>::Result LowerType;
+
   void UpperMethod()
   {
     cout << "Hello from PolicyClass for UpperPolicy" << endl;
@@ -178,6 +220,8 @@ struct PolicyClass : public
     cout << "Hello from PolicyClass for LowerPolicy" << endl;
   }
 };
+
+
 
 int main()
 {
