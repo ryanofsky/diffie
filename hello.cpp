@@ -1,37 +1,38 @@
 #include <iostream>
 #include <boost/type_traits.hpp>
 
-namespace detail
+// Workaround for the "heinous VC typedef dependent template parameter bug"
+// mentioned in:
+// 
+//   http://lists.boost.org/MailArchives/boost/msg13628.php
+//   http://lists.boost.org/MailArchives/boost/msg20915.php
+//   http://lists.boost.org/MailArchives/boost/msg21642.php
+//   http://lists.boost.org/MailArchives/boost/msg21647.php
+//
+//
+
+
+
+template<class T>
+struct false_c
 {
-  template<class T>
-  struct msvc_never_true
-  {
-    struct fake_type;
-    BOOST_STATIC_CONSTANT(bool, value = (boost::is_same<T, fake_type>::value));
-    //enum { value = false };
-  };
+  enum { value = false };
 };
 
-template<typename Allocator, typename T>
-struct foo
+template<typename POLICY, typename ACTUAL, typename BASE>
+struct Workaround
 {
   template<bool>
-  struct Allocator_wrapper : Allocator
+  struct Helper : POLICY
   {};
   
   template<>
-  struct Allocator_wrapper<true> : Allocator
+  struct Helper<true> : POLICY
   {
-    template<class> struct rebind;
+    template<class a, class b> struct Policy;
   };
   
-  typedef 
-    typename Allocator_wrapper
-    <
-      detail::msvc_never_true<Allocator>::value
-    >::template rebind<T>
- 
-  allocator_type;
+  typedef Helper<false_c<POLICY>::value>::template Policy<ACTUAL, BASE> type;
 };
 
 
@@ -40,8 +41,8 @@ struct foo
 
 struct LowerPolicy
 {
-  template<class ACTUAL>
-  struct rebind
+  template<class ACTUAL, class Base>
+  struct Policy
   {
     void go()
     {
@@ -56,8 +57,8 @@ using namespace std;
 template<class T>
 struct abc
 {
-  //typedef T::template rebind<int> dfg;
-  typedef foo<T, int>::allocator_type dfg;
+  //typedef T::template Policy<int> dfg;
+  typedef Workaround<T, T, T>::type dfg;
 };
 
 void main()
