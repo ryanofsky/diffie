@@ -49,38 +49,31 @@ struct FriendlySpec
   typedef Specialize<typename POLICY::Identity>::Params<typename POLICY::Params, ACTUAL, BASE>::Result Result;
 };
 
-template<class ACTUAL, class TYPE_LIST>
+template<class TYPE_LIST>
 struct PolicyHelper;
 
-template<class TYPE_LIST>
-struct PolicyHelpImpl
-{
-  template<class ACTUAL>
-  struct Actual
-  {
-    typedef PolicyHelper<ACTUAL, typename TYPE_LIST::Tail> NextImpl;
-    typedef FriendlySpec<typename TYPE_LIST::Head, ACTUAL, NextImpl::Policy >::Result PolicyImpl;
-  };
-};
-
 template<>
-struct PolicyHelpImpl<NullType>
+struct PolicyHelper<NullType>
 {
   template<class ACTUAL>
   struct Actual
   {
-    typedef EmptyType PolicyImpl;
-    typedef EmptyType NextImpl;
+    typedef EmptyType Next;
+    typedef EmptyType Policy;
   };
 };
 
-template<class ACTUAL, class TYPE_LIST>
-struct PolicyHelper 
+template<class TYPE_LIST>
+struct PolicyHelper
 {
-  typedef PolicyHelpImpl<TYPE_LIST>::Actual<ACTUAL> Impl;
-  typedef typename Impl::PolicyImpl Policy;
-  typedef typename Impl::NextImpl Next;
+  template<class ACTUAL>
+  struct Actual
+  {
+    typedef PolicyHelper<typename TYPE_LIST::Tail>::Actual<ACTUAL> Next;
+    typedef FriendlySpec<typename TYPE_LIST::Head, ACTUAL, Next::Policy >::Result Policy;
+  };
 };
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Testing Stuff
@@ -149,22 +142,29 @@ struct Specialize<LowerPolicy>
   };
 };
 
+template<class ACTUAL, class TYPE_LIST>
+struct FriendlyPolicyHelper
+{
+  typedef PolicyHelper<TYPE_LIST>::Actual<ACTUAL> Helper;
+  typedef Helper::Policy Policy;
+//  typedef Helper::Next Next;
+};
+
 template<class UPPER_POLICY, class LOWER_POLICY>
-struct PolicyClass : 
-  public 
-    PolicyHelper
-    <
-      PolicyClass<UPPER_POLICY, LOWER_POLICY>,
-      TypeList< UPPER_POLICY, TypeList<LOWER_POLICY, NullType> >
-    >::Policy
+struct PolicyClass : public 
+  FriendlyPolicyHelper
+  <
+    PolicyClass<UPPER_POLICY, LOWER_POLICY>,
+    TypeList< UPPER_POLICY, TypeList<LOWER_POLICY, NullType> >
+  >::Policy
 {
   typedef
-    PolicyHelper
+    FriendlyPolicyHelper
     <
       PolicyClass<UPPER_POLICY, LOWER_POLICY>,
       TypeList< UPPER_POLICY, TypeList<LOWER_POLICY, NullType> >
-    > Helper;
-
+    >::Helper Helper;
+  
   typedef Helper::Policy UpperType;
   typedef Helper::Next::Policy LowerType;
     
@@ -182,6 +182,7 @@ struct PolicyClass :
 int main()
 {
   typedef PolicyClass<UpperPolicy, LowerPolicy> P;
+
   P p;
 
   cout << "********************************************" << endl << endl
