@@ -1,0 +1,24 @@
+DHIES*
+
+An assymmetric encryption algorithm with (optional) message verification. A message is encrypted with a public key, and can be decrypted with a private key. The built-in message verfication can be used on the decryption end to detect if the ciphertext was corrupted. Verifying a message requires knowledge of the secret key, and can be done without decrypting the message.
+
+When using DHIES, you can choose which algorithms to use.
+
+- A keypair generation algorithm. To generate a random, "ephermal" public and private key pair. Classes that can be used to provide this functionality in Crypto++ are GDSAVerifier, [XXX: what else?].
+
+- A secret value derivation algorithm. The algorithm takes an public key and a secret key (from different keypairs) as input and returns a stream of octets as output. The output will be the result of running the value of some function f(public key, private key) through a hash function**. The behavior of the f depends on the types on keypairs used, but it should have the property that for any two keypairs, kp1 and kp2, f(kp1.public, kp2.private) == f(kp2.public, kp2.private).
+
+- (optional) Symmetric encryption / decryption algorithm. Takes an encryption key as input and returns a pointer to a BufferedTransformation object as output.
+
+- (optional) Message algorithm. Takes a MAC key as input and returns a pointer to a MessageAuthenticationCode object as output.
+
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+* Not only do you get to choose which primitives to use for this algorithm, you also get to choose what name to call it, as it is alternately known as DHEAS, DHES, DLES, ECES, and DL/ECIES. DHAES is the name given to in the original paper. DHIES is the name of the algorithm recommended in the second paper. The second paper refers to both DHAES and DHES, so presumably, DHES was a name used between the first and second papers. The first paper uses the name DLES to refer to DHAES when it is used with discrete logarithm primitives and ECES when used with elliptic curve primitives. And the latest draft of the IEEE P1363a standard (draft 9) calls entire algorithm DL/ECIES.
+
+Paper 1 - September 1998 - http://grouper.ieee.org/groups/1363/P1363a/contributions/dhaes.pdf
+Paper 2 - September 2001 - http://www.cs.ucsd.edu/users/mihir/papers/dhaes.pdf http://www-cse.ucsd.edu/users/mihir/papers/dhaes.pdf
+IEEE P1363a Draft 9 - June 13, 2001 - http://grouper.ieee.org/groups/1363/ in 9th draft
+
+** The application of f() and the execution of the hash function are really distinct steps. The reason why they are combined in a single parameter is to allow for the most amount of flexibility in coupling the two operations with complicating the design of the DHIES class. The flexibility is needed to have compatibility with other implementations of DHIES. For example, when f() is used on DSA keys, it returns an arbitrary precision integer. In Freenet, the integer is converted into a length prefix octet string before it is hashed, but in BeeCrypt and IEEE P1363a, the integer is just padded with zeros. The DHIES_Freenet_Secret and DHIES_DSA_Secret parameter classes allow for compatibility with either implementation.
