@@ -1,52 +1,20 @@
 #ifndef smart_resource
 #define smart_resource
 
-template<class ACTUAL = Unspecified, class BASE = Unspecified>
-class TopManager
-{
-public:
-  typedef TopManager<> Identity;
-  typedef NullType Parameterization;
-  
-protected:  
+// reason why IsNull() and SetNull() might need to be optional:
+//   for certain types of managers, IsNull() and SetNull() would
+//   be expensive to implement. One example would be a pointer
+//   to an object which is freely constructed and destructed
+//   on a place on the stack. there is no automated way 
+//   of checking to see whether a class is constructed, so the
+//   only way of doing null testing is to store a boolean
+//   for each instance
+//   
+// but certain ownership policies (ie ReluctantReference<>) don't
+// need to use null checking [xxx: is this true?] so the
+// expense is not neccessary
 
-  void CopyForWrite()
-  {
-    ACTUAL & o = *((ACTUAL *)this);
-    if (!this.Own())
-    {
-      MANAGER m;
-      m.DeepCopy(o);
-      o.ShallowCopy(m);
-    }
-  }
-  
-  void Dispose()
-  {
-    ACTUAL & o = *((ACTUAL *)this); 
-    if (this.Disown())
-    {
-      m.Dispose();
-      m.SetNull();  
-    }
-  }
-  
-  void PreOpen()
-  {
-  }
-
-  template<class ARG_OWNERSHIP>
-  void Assign(ARG_OWNERSHIP<MANAGER> const & other)
-  {
-    Dispose();
-    ACTUAL & o = *((ACTUAL *) this);
-    
-    if (other.Own())
-    {
-      this.own();
-    }
-  }
-};
+#include "general.hpp"
 
 // for all 
 //   BASE - type that this class should inherit from
@@ -56,28 +24,36 @@ protected:
 //            of this class. the PARAM class is just a way of stuffing a large number of template
 //            parameters into a single argument. 
 
+/*
+  
+  Define the HandleManager interface
+
 template<class ACTUAL = Unspecified, class BASE = Unspecified>
 class HandleManager : public TopManager<ACTUAL, SomeBaseClass>
 {
 public:
 
+  typedef HandleManager<> Identity;
+  typedef Unspecified Parameterization;
+
   template<class NEW_ACTUAL, class NEW_BASE>
   struct Specify { typedef HandleManager<NEW_ACTUAL, NEW_BASE> result; };
   
-  enum { HAS_NULLCHECKING = true };
-  enum { HAS_OWNERSHIPCHECKING = true };
-
   //! Required by all
   void ShallowCopy(HandleManager const & HandleManager);
   void Close();
   
-  //! Optional (set HAS_NULLCHECKING to true if present)
+  //! Set Handle to null value, and check for null
   void SetNull();
   bool IsNull();
 
-  //! Optional (set HAS_OWNERSHIPCHECKING to true if present)
-  void Disown();
-  bool Owns();
+  //! Set ownership to null, in most cases this is just
+  // indicated by a normal null handle, but for more
+  // complex resource types it is possible to store
+  // the ownership value separately without any
+  // additional overhead
+  void SetOwnNull();
+  bool IsOwnNull();
   
   //! Required for COW, Duplicate
   DeepCopy();
@@ -90,9 +66,12 @@ public:
   void Swallow(OneArg);
   
   //! Open
-  void Open(...)
-
+  void Open(...);
 };
+
+*/
+
+/* Define the HandlePolicy interface
 
 template<class ACTUAL = Unspecified, class BASE = Unspecified>
 class HandlePolicy : public BASE::Chain<ACTUAL, 
@@ -104,73 +83,128 @@ public:
   
 };
 
+*/
+
+template<class, class> class SmartResource;
+
+/*
+
+XXX: what is the purpose of this class?
+
 template<class ARG_MANAGER, class ARG_POLICY>
+class MagicWrapper
+{
+  typedef Magic
+  <
+    SmartResource<ARG_MANAGER, ARG_POLICY>,
+    List<ARG_POLICY, List<ARG_MANAGER, NullType> >
+  > Result;
+
+  typedef Manager;
+  typedef Policy;
+};
+
+*/
+
+template<class, class>
+struct asdf;
+
+template<class MANAGER, class OWNERSHIP>
 class SmartResource : 
   public Magic
   <
-    SmartResource<ARG_MANAGER, ARG_POLICY>,
-    List<ARG_POLICY, LIST<ARG_MANAGER, NullType> >
+    SmartResource<MANAGER, OWNERSHIP>,
+    List<OWNERSHIP, List<MANAGER, NullType> >
   >
 {
-  typedef POLICY<MANAGER> BaseType;
-  typedef SmartResource<MANAGER, POLICY> ThisType;
-
+  typedef SmartResource<MANAGER, OWNERSHIP> ThisType;
+  
+  typedef Magic
+  <
+    SmartResource<MANAGER, OWNERSHIP>,
+    asdf<OWNERSHIP, asdf<MANAGER, NullType> >
+  > magic;
+  
+  typedef typename magic::Policy Policy;
+  typedef typename magic::Next::Policy Manager;
   
 public:    
  
-  SmartResource() : BaseType() {}
-  ~SmartResource() { BaseType::Discard(); } 
-
-  SmartResource(ThisType const & c) { BaseType::Assign(c); }
-
-  BaseType & operator= () { BaseType::Assign(c); return *this; }
+  ~SmartResource() { Discard(); } 
 
   // XXX: repeat 0..15
-  template<A1, A2, A3>
+  // also this needs to use EfficientPass
+  template<typename A1, typename A2, typename A3>
   SmartResource(A1 a1, A2 a2, A3 a3)
-  { MANAGER::Open(a1, a2, a3); }
+  { Manager::Open(a1, a2, a3); }
 
-  ~SmartResource()
-  {
-    if (!MANAGER::IsNull() && POLICY::DisOwn())
-    {
-      MANAGER::Close();
-    }
-  }
-
-  template<class SMART_OTHER> 
-  SmartResource (SMART_OTHER r)
-  { 
-    Constructor(r, int2type<type_equals<SMART_OTHER, arg1<OWNERSHIP::Release> > >);
-  }
-
-private:
-
-  template<class T1>
-  void Constructor(T1 t1, int2type<false> i) { Release(t1); }
-  
-  template<class T2>
-  void Constructor(T2 t2, int2type<true> i) { Open(t2); }
-
-public:
+  //XXX: need parameterized copy constructors
+  //1) for other SmartResource<...>'s, this will be identifical
+  //   to operator=() methods
+  //2) for any other type, T, call Manager::Open(T), if it exists
+  //   otherwise call Manager::Release(T)
 
   template<class SMART_OTHER>
-  THIS & operator=(SMART_OTHER r)
+  ThisType & operator=(SMART_OTHER r)
   {
     SmartAssign<OWNERSHIP, SMART_OTHER::OWNERSHIP> sa;
     sa(*this, r);
     MANAGER::ShallowCopy(r);
   }
   
-
+  template<class ARG_MANAGER, class ARG_OWNERSHIP>
+  ThisType & operator=(SmartResource<ARG_MANAGER, ARG_OWNERSHIP> const & src) 
+  {
+    if (this != &src)
+    {
+      SmartAssign<OWNERSHIP, ARG_OWNERSHIP> sa;
+      sa(*this, *src);
+    }
+  }
   
-  THIS copy()
+  // xxx: use efficient pass
+  template<class ANYTHING_EXECPT_SMART_RESOURCE>
+  ThisType & operator=(ANYTHING_EXCEPT_SMART_RESOURCE arg)
+  {
+    Ownership::Swallow(arg);    
+  }
+  
+  ThisType copy()
   { 
     R temp;
     temp.shallowcopy(*this);
     temp.duplicate();
     return temp; 
   };
+  
+  void Discard()
+  { 
+    if (!Manager::IsNull() && Ownership::DisOwn())
+    {
+      Manager::Close();
+      Manager::SetNull();
+    }
+  }
+  
+  void CopyForWrite()
+  {
+    ACTUAL & o = *((ACTUAL *)this);
+    if (!this.Own())
+    {
+      Manager m;
+      m.DeepCopy(o);
+      o.ShallowCopy(m);
+    }
+  }
+  
+  void Dispose()
+  {
+    if (OwnerShip::Disown())
+    {
+      Dispose();
+      SetNull();  
+    }
+  }
 };
 
 class HandlePolicy
