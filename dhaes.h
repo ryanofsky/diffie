@@ -4,234 +4,157 @@
 #include "cryptlib.h"
 #include "hmac.h"
 
-class HandleManager
-{
-public:
-  typedef HANDLE Handle;
+// Description (outline)
+//
+// Goal handle of resource management is just to open resources
+// when they are needed and to close them when they are no longer
+// needed.
+//
+// Most straightforward way of doing this is to do give open()
+// and close() in code. This is the only way in languages like
+// c and java. The only problem with this is that it becomes complex
+// to deal with in blocks of code that have multiple exit points, and
+// in cases where ... [#1 specify where exactly the complexity becomes too difficult
+// to deal with #2 forget about C++, think where dealing with JDBC handles became too
+// complicated. connection re-use? ]. In Java, the difficulty
+// is mitigated because management of the most commonly used resource, memory
+// is handled internally by a garbage collector, and because the try ... finally
+// construct allows other resources to be released in a simple (but verbose) way
+// even in complex blocks of code
+//
+// ReluctantRefCount uses a behavior which is similar in spirit to Destructive Copy
+// or so-called "Move Semantics". When one is A is assigned to B and A has ownership intially,
+// then during the assignment, ownership is transferred from A to B. This is not quite the
+// same as destructive copy, because as long as B is alive, A will still be usable.
+//
+// Notes:
+//
+// a> compile-time-virtual-method, just pass subclass in as template
+// what would be some good syntax to express this? also, what happens
+// for multiple inheritance in a diamond-shaped hierarchy. mi screws 
+// everything up.
+//
+// a> template paramaters for a class (or function) should be automatically
+// be available inside and outside the class or function.
+//
+// a> there should really be a way to do typedefs ANYWHERE in the program, such as
+// between template<class B> and class A : public B. Otherwise you just end up typing
+// the same thing again and again.
+//
+// what actually happens when a throw occurs in a destructor? instant death? failure to
+// call other destructors further down the stack? performance degradation?
+//
+// is there any way to make an abstract class without using virtual methods?
+// can you still say = 0; Can you declare the method without defining it. 
+//
+// Possible pitfall in Visual C++: forward declaration is impossible,
+// but is it needed?
+//
+// Owns() - will this object delete upon destruction?
+//
+// I thought Loki's ownership policy had the exact same interface as mine. 
+// If so, what is the analogue of internal_assign(). internal_assign is the
+// only place that incrmenets the reference count.
+//
+// Figure out how to make mossible intrusive ownership
+//
+// Does a protected constructor on a subclass mean that class which inherits from it can
+// instantiate it or, just call it in one of its preambles?
+//
+// is there (should there be?) a difference in behavior between counter == TRANSFER
+// and *counter == 1? Yes, in the former case, on assignment ownership will be transfered
+// and in the latter case it will be shared. In both cases Owned() returns true.
+// Now, conversion from former->latter happens
+// when you call RefCount() helper method. When (if ever) does the reverse conversion occur
+// and when would it be useful.
+//
+// grammar: owned() should be owns(). Every resource is owned by something, the question is whether
+// the particular smart pointer is the owner.
 
-  //! Required by all
 
-  void SetNull();
-  bool IsNull();
-  void ShallowCopy(HandleManager const & HandleManager);
-  void Close();
-  
-  //! Required for COW, Duplicate
-  DeepCopy();
+// this is a bad, bad adaptation. the goal in making it was to fully featured
+// but safe and minimally invasive;
 
-  //! Required for intrusive count
-  AddRef();
-  DeleteRef();
-
-protected:  
-  Handle handle_;
-};
+// the ultimate fix would be to support Managers with no null-testing or setting.
+// hmm, and how would that work?
+// in any case, it seems analogous to the case for strings ownership can be determined
+// internally by looking at the size parameters.
+// both are queries not functions.
+//
+// the real problem is that in some cases there is a trick to fold the 
+// info into the manager policy and in other cases there is a trick
+// to fold it into the ownership policy. and what happens when there
+// is no trick for either. 
+//
+// Idea A: use type traits for manager and owner policy classes to the
+// effect of ENUM { TRICKY_NULL, NO_TRICKY_NULL }, ENUM { TRICKY_OWNERSHIP, NO_TRICKY_OWNERSHIP}
+// when neither manager nor ownership is tricky, add an extra boolean variable. when one
+// is tricky, use the trick. when both are tricky??????
+//
+// Idea B: just automatically assume null and simple ownership setting and getting
+// are part of the interface. One justification is the methods to get and reset ownership
+// would be needed for the string case ANYWAY, if string is to be used with pre-existing
+// policies. The downside is that the Manager interface keeps growing and growing. But I
+// think that once the system can handle strings and objects efficiently, legally, and
+// with a small number of policy classes, it should be able to handle just about any
+// other case. In any case, it does seem smart to favor expanding the manager
+// interface over increasing the number number of policy classes because the latter option
+// increases exponentially the number of assignment directives that need to be written. also,
+// writing policy classes that work efficiently with all mangers makes them more useful. 
 
 template<typename T>
-class SecBufferManager : SecBuffer<T>
+class SecBufferManager : HandleManager<SecBuffer<T> >
 {
+  typedef SecBuffer<T> Parent;
+  typedef HandeManager<Parent> MParent;
   
-}
-
-template<typename T>
-class PointerManager
-{
-protected:
+  SecBufferManager
+  {
+    MParent::Open();
+    Parent::~Parent();
+    ptr = null;
+    size = 0;
+  }
+  
   void SetNull()
   {
-    t = 0;
+    size = 0;
+    ptr = 0;
   }
-
+  
   bool IsNull()
   {
-    return t == 0;
+    return !ptr;
   }
-
-  void ShallowCopy(PointerManager const & p)
+  
+  void ShallowCopy(Parent const & t)
   {
-    t = p.t;
+    ptr = t.ptr;
+    size = t.size;
   }
-
-  void DeepCopy(PointerManager const & p)
+  
+  void DeepCopy(Parent const & t)
   {
-    t = new PointerType(p.t)
+    Parent::operator=(t);
   }
-
+  
+  void Close();
+  {
+    Parent::Dispose();
+    Parent::~Parent();
+  };
+  
+  void Open(int size)
+  {
+    new (*this) Parent(size);
+  }
+  
   void Close()
   {
-    delete T;
+    Parent::~Parent();  
+    ptr = 0; size = 0;
   }
-
-  PointerType & operator->()
-  {
-    return *t;
-  }
-
-  PointerType * operator*()
-  {
-    return t;
-  }
-
-  T * t;
 };
-
-
-
-class HandlePolicy
-{
-  //! Reset ownership. Get in default state for non-nulln handle. called during open() or assignment from raw handle
-  void Reset();
-  
-  //! take ownership
-  void Own() {}
-  
-  //! returns true if was owned, false otherwise
-  bool Disown() {}
-  
-  //! returns true of owned, false otherwise
-  bool Owned() {}
-};
-
-template<class MANAGER>
-class RefCount : public MANAGER
-{
-  enum { ACCESS = 0; TRANSFER = ~ACCESS };
-
-  RefCount() : counter(ACCESS) {}
-
-public:
-  void Assign(MANAGER const & m)
-  {
-
-  }
-
-  void Discard()
-  {
-  }
-
-
-protected:
-
-  void Own()
-  {
-	  if (counter == ACCESS) // if access
-		  counter = TRANSFER;
-	  else if (counter != TRANSFER) // if refcounted	
-		  if (*counter != 1) 
-      {
-  			--*counter;
-	  		counter = TRANSFER;
-      }
-  }
-
-  bool Disown()
-  {
-	  if (counter == TRANSFER) // if transfer
-	  	counter = ACCESS;
-  	else if (counter != ACCESS) // if refcounted
-	   	if (--*counter == 0)
-      {
-	  		delete counter;
-	  		counter = ACCESS;
-      }
-  }
-
-  bool Owned()
-  {
-	  if (counter == ACCESS) // if access
-		  return false;
-	  else if (counter == TRANSFER) // if transfer
-	      return true;
-	  else // if refcounted
-		  return *counter == 1;
-  }
-
-  int * counter;
-};
-
-template<class MANAGER>
-class DestructiveCopy : public MANAGER
-{
-};
-
-
-template<class MANAGER>
-class Access
-{
-};
-
-template<class MANAGER>
-class Intrusive : public MANAGER
-{
-
-};
-
-template<class MANAGER, class POLICY>
-class SmartResource : protected POLICY<MANAGER>
-{
-  typedef POLICY<MANAGER> BaseType;
-  typedef SmartResource<MANAGER, POLICY> ThisType;
-
-private:
-
-  void internal_assign(Resource const & r) const
-  {
-  	counter = r.counter;
-  	if (counter == TRANSFER) // if transfer
-		  r.counter = ACCESS;
-	  else if (counter != ACCESS) // if refcount
-  		++*counter;
-  };
-
-  void Resource::internal_makeref() const
-  {
-  	if (counter == TRANSFER) counter = new unsigned int(1);
-  };
-  
-  void assign(R const & r)
-  { 
-    shallowcopy(r);
-    internal_assign(r);
-  }; 
-
-
-public:  
-  
-  SmartResource() : BaseType() {}
-  ~SmartResource() { BaseType::Discard(); } 
-
-  SmartResource(ThisType const & c) { BaseType::Assign(c); }
-
-  BaseType & operator= () { BaseType::Assign(c); return *this; }
-
-
-
-  // XXX: repeat 0..15
-  template<A1, A2, A3>
-  SmartResource(A1 a1, A2 a2, A3 a3)
-  { MANAGER::Open(a1, a2, a3); }
-
-  ~SmartResource()
-  {
-    if (!MANAGER::IsNull() && POLICY::DisOwn())
-    {
-      MANAGER::Close();
-    }
-  }
-
-	R (R const & r)
-  { 
-    assign(r);
-  } 
-			R & operator=(R const & r) { discard(); assign(r); return *this; }; 
-			R & refcount() { internal_makeref(); return *this;	}; 
-			R access() { R temp; temp.shallowcopy(*this); return temp; };
-
-      R copy() { R temp; temp.shallowcopy(*this); temp.duplicate(); return temp; };
-}
-
-};
-
 
 //! Abstract base class for DHIES key derivation
 class DHIES_KeyDerive
