@@ -4,157 +4,517 @@
 #include "cryptlib.h"
 #include "hmac.h"
 
-//! ElGamal Encryptor
-class ElGamalEncryptor : public PK_WithPrecomputation<PK_FixedLengthEncryptor>
+class HandleManager
 {
 public:
-	ElGamalEncryptor(const Integer &p, const Integer &g, const Integer &y);
-	ElGamalEncryptor(BufferedTransformation &bt);
+  typedef HANDLE Handle;
 
-	void DEREncode(BufferedTransformation &bt) const;
+  //! Required by all
 
-	void Precompute(unsigned int precomputationStorage=16);
-	void LoadPrecomputation(BufferedTransformation &storedPrecomputation);
-	void SavePrecomputation(BufferedTransformation &storedPrecomputation) const;
+  void SetNull();
+  bool IsNull();
+  void ShallowCopy(HandleManager const & HandleManager);
+  void Close();
+  
+  //! Required for COW, Duplicate
+  DeepCopy();
 
-	void Encrypt(RandomNumberGenerator &rng, const byte *plainText, unsigned int plainTextLength, byte *cipherText);
+  //! Required for intrusive count
+  AddRef();
+  DeleteRef();
 
-	unsigned int MaxPlainTextLength() const {return STDMIN(255U, m_p.ByteCount()-3);}
-	unsigned int CipherTextLength() const {return 2*m_p.ByteCount();}
-
-	void RawEncrypt(const Integer &k, const Integer &m, Integer &a, Integer &b) const;
-
-	const Integer & GetModulus() const {return m_p;}
-	const Integer & GetGenerator() const {return m_g;}
-	const Integer & GetPublicResidue() const {return m_y;}
-
-	const ModExpPrecomputation & GetGPC() const {return m_gpc;}
-	const ModExpPrecomputation & GetYPC() const {return m_ypc;}
-
-protected:
-	ElGamalEncryptor() {}
-	unsigned int ExponentBitLength() const;
-
-	Integer m_p, m_g, m_y;
-	ModExpPrecomputation m_gpc, m_ypc;
+protected:  
+  Handle handle_;
 };
 
-//! ElGamal Decryptor
-class ElGamalDecryptor : public ElGamalEncryptor, public PK_FixedLengthDecryptor
+template<typename T>
+class SecBufferManager : SecBuffer<T>
 {
-public:
-	ElGamalDecryptor(const Integer &p, const Integer &g, const Integer &y, const Integer &x);
-	ElGamalDecryptor(RandomNumberGenerator &rng, unsigned int pbits);
-	// generate a random private key, given p and g
-	ElGamalDecryptor(RandomNumberGenerator &rng, const Integer &p, const Integer &g);
+  
+}
 
-	ElGamalDecryptor(BufferedTransformation &bt);
-	void DEREncode(BufferedTransformation &bt) const;
-
-	unsigned int Decrypt(const byte *cipherText, byte *plainText);
-
-	void RawDecrypt(const Integer &a, const Integer &b, Integer &m) const;
-
-	const Integer & GetPrivateExponent() const {return m_x;}
-
+template<typename T>
+class PointerManager
+{
 protected:
-	Integer m_x;
-};
-
-
-
-class Freenet_H
-{
-  enum { DIGESTSIZE = 32 };
-  void operator()(Integer const & a, Integer const & b, unsigned byte * out)
+  void SetNull()
   {
+    t = 0;
+  }
+
+  bool IsNull()
+  {
+    return t == 0;
+  }
+
+  void ShallowCopy(PointerManager const & p)
+  {
+    t = p.t;
+  }
+
+  void DeepCopy(PointerManager const & p)
+  {
+    t = new PointerType(p.t)
+  }
+
+  void Close()
+  {
+    delete T;
+  }
+
+  PointerType & operator->()
+  {
+    return *t;
+  }
+
+  PointerType * operator*()
+  {
+    return t;
+  }
+
+  T * t;
+};
+
+
+
+class HandlePolicy
+{
+  //! Reset ownership. Get in default state for non-nulln handle. called during open() or assignment from raw handle
+  void Reset();
+  
+  //! take ownership
+  void Own() {}
+  
+  //! returns true if was owned, false otherwise
+  bool Disown() {}
+  
+  //! returns true of owned, false otherwise
+  bool Owned() {}
+};
+
+template<class MANAGER>
+class RefCount : public MANAGER
+{
+  enum { ACCESS = 0; TRANSFER = ~ACCESS };
+
+  RefCount() : counter(ACCESS) {}
+
+public:
+  void Assign(MANAGER const & m)
+  {
+
+  }
+
+  void Discard()
+  {
+  }
+
+
+protected:
+
+  void Own()
+  {
+	  if (counter == ACCESS) // if access
+		  counter = TRANSFER;
+	  else if (counter != TRANSFER) // if refcounted	
+		  if (*counter != 1) 
+      {
+  			--*counter;
+	  		counter = TRANSFER;
+      }
+  }
+
+  bool Disown()
+  {
+	  if (counter == TRANSFER) // if transfer
+	  	counter = ACCESS;
+  	else if (counter != ACCESS) // if refcounted
+	   	if (--*counter == 0)
+      {
+	  		delete counter;
+	  		counter = ACCESS;
+      }
+  }
+
+  bool Owned()
+  {
+	  if (counter == ACCESS) // if access
+		  return false;
+	  else if (counter == TRANSFER) // if transfer
+	      return true;
+	  else // if refcounted
+		  return *counter == 1;
+  }
+
+  int * counter;
+};
+
+template<class MANAGER>
+class DestructiveCopy : public MANAGER
+{
+};
+
+
+template<class MANAGER>
+class Access
+{
+};
+
+template<class MANAGER>
+class Intrusive : public MANAGER
+{
+
+};
+
+template<class MANAGER, class POLICY>
+class SmartResource : protected POLICY<MANAGER>
+{
+  typedef POLICY<MANAGER> BaseType;
+  typedef SmartResource<MANAGER, POLICY> ThisType;
+
+private:
+
+  void internal_assign(Resource const & r) const
+  {
+  	counter = r.counter;
+  	if (counter == TRANSFER) // if transfer
+		  r.counter = ACCESS;
+	  else if (counter != ACCESS) // if refcount
+  		++*counter;
+  };
+
+  void Resource::internal_makeref() const
+  {
+  	if (counter == TRANSFER) counter = new unsigned int(1);
+  };
+  
+  void assign(R const & r)
+  { 
+    shallowcopy(r);
+    internal_assign(r);
+  }; 
+
+
+public:  
+  
+  SmartResource() : BaseType() {}
+  ~SmartResource() { BaseType::Discard(); } 
+
+  SmartResource(ThisType const & c) { BaseType::Assign(c); }
+
+  BaseType & operator= () { BaseType::Assign(c); return *this; }
+
+
+
+  // XXX: repeat 0..15
+  template<A1, A2, A3>
+  SmartResource(A1 a1, A2 a2, A3 a3)
+  { MANAGER::Open(a1, a2, a3); }
+
+  ~SmartResource()
+  {
+    if (!MANAGER::IsNull() && POLICY::DisOwn())
+    {
+      MANAGER::Close();
+    }
+  }
+
+	R (R const & r)
+  { 
+    assign(r);
+  } 
+			R & operator=(R const & r) { discard(); assign(r); return *this; }; 
+			R & refcount() { internal_makeref(); return *this;	}; 
+			R access() { R temp; temp.shallowcopy(*this); return temp; };
+
+      R copy() { R temp; temp.shallowcopy(*this); temp.duplicate(); return temp; };
+}
+
+};
+
+
+//! Abstract base class for DHIES key derivation
+class DHIES_KeyDerive
+{
+  virtual void DeriveKey(byte * out, int outSize, byte const * sharedSecret, int sharedSecretSize, byte const * publicKey, int publicKeySize) = 0
+};
+
+//! DHIES key derivation using P1363 KDF2 algorithm, paramterized by hash function
+template<class H>
+class DHIES_P1363_KDF2 : public DHIES_KeyDerive
+{
+  P1363_KDF2<H> kdf;
+
+  void DeriveKey(byte * out, int outSize, byte const * sharedSecret, int sharedSecretSize, byte const * publicKey, int publicKeySize)
+  {
+    kdf.DeriveKey(out, outSize, sharedSecret, sharedSecretSize);
+  }
+};
+
+//! DHIES key derivation freenet-style
+class DHIES_Freenet_KeyDerive : public DHIES_KeyDerive
+{
+  void DeriveKey(byte * out, int outSize, byte const * sharedSecret, int sharedSecretSize, byte const * publicKey, int publicKeySize)
+  {
+    assert(sharedSecretSize == 128);
+    assert(sharedSecretSize == 128);
+    assert(outSize == 256);
+    SHA256 h;
+    HashFilter hf(h, new ArraySink(out, outSize));
+    Integer U(publicKey, publicKeySize);
+    Integer X(sharedSecret, sharedSecretSize);
+    U.OpenPGPEncode(hf);
+    X.OpenPGPEncode(hf);
+    hf.MessageEnd();
+    h.Final(out);
+  }
+}
+
+//! DHIES key derivation function which is compatible with beecrypt. Parameterized by hash function.
+template<class H>
+class DHIES_BeeCrypt_KeyDerive : public DHIES_KeyDerive
+{
+  void DeriveKey(byte * out, int outSize, byte const * sharedSecret, int sharedSecretSize, byte const * publicKey, int publicKeySize)
+  {
+    assert(outSize == h.DigestSize());
+    H h;
+    h.Update(publicKey, publicKeySize);
+    h.Update(sharedSecret, sharedSecretSize);
+    h.Final(out);
+  }
+}
+
+template<class KEY_GENERATOR, class SECRET_DERIVER>
+class DHIES_EncryptorBase
+{
+public:
+  
+  KEY_GENERATOR keyGenerator;
+
+  DHIES_EncryptorBase(Verifier & const verifier, KEY_GENERATOR const & keyGenerator, SECRET_DERIVER const & secretDeriver)
+  : verifier_(verifier), secretDeriver_(secretDeriver), keyGenerator_(keyGenerator);
+  {}
+
+  DHIES_EncryptorBase(GDSAVerifier & publicKey)
+  {
+    GDSAVerifier & publicKey
+  }
+
+  void Encrypt(RandomNumberGenerator & rng, byte * out, int outSize)
+  {
+    int publicSize = akad->EphemeralPublicKeyLength();
+    int privateSize = akad->EphemeralPrivateKeyLength();
+    int agreedSize = akad->AgreedValueLength();
+
+    SecBlock<byte> ephermal(privateSize + publicSize + agreedSize);
+
+    byte * privatePtr = ephermal.ptr;
+    byte * publicPtr = privatePtr + privateSize;
+    byte * agreedPtr = publicPtr + publicSize;
+
+    skad->GenerateKeyPair(rng, privatePtr, publicPtr)
+    bool r = skad->Agree(agreedPtr, privatePtr, publicKey, false);
+    secretDeriver.DeriveKey(out, outSize, agreedPtr, aggreedSize, publicptr, publicSize);
+  }
+
+protected:
+  PK_SimpleKeyAgreementDomain const & skad;
+  DHIES_KeyDerive & kdf;
+  SecBlock<byte> publicKey;
+}
+
+template<class KEY_GENERATOR, class SECRET_DERIVER>
+class DHIES_DecryptorBase
+{
+  void Decrypt(byte const * ephermalPublicKey, byte * out, int outSize)
+  {
+    assert(akad->EphemeralPrivateKeyLength() == privateKey.size());
+    SecBlock<byte> agreed(akad->AgreedValueLength());
+    skad->Agree(agreedPtr, privateKey.ptr, ephermalPublicKey, false);
+    secretDeriver.DeriveKey(out, outSize, agreed.Ptr, aggreedSize, ephermalPublicKey, akad->EphemeralPublicKeyLength());
+  }
+
+protected:
+  PK_SimpleKeyAgreementDomain const & skad;
+  DHIES_KeyDerive & kdf;
+  SecBlock<byte> publicKey;
+  SecBlock<byte> privateKey;
+};
+
+
+template<class KEY_GENERATOR, class SECRET_DERIVER, class ENCRYPTOR, class AUTHENTICATOR>
+class DHIES_Encryptor : public DHIES_EncryptorBase<KEY_GENERATOR, SECRET_DERIVER>
+{
+  DHIES_Encryptor(Verifier & const verifier, 
+    KEY_GENERATOR const & keyGenerator, SECRET_DERIVER const & secretDeriver,
+    ENCRYPTOR const & encryptor, AUTHENTICATOR const & authenticator)
+  : DHIES_EncryptorBase(verifier, keyGenerator, secretDeriver), 
+    encryptor_(encryptor), authenticator_(authenticator)
+  {}
+
+  Encrypt(RandomNumberGenerator & rng, byte const * plainText. int size, byte * out)
+  {
+    Raw
+  }
+
+protected:
+  ENCRYPTOR encryptor_;
+  AUTHENTICATOR authenticator_;
+}
+  
+  void RawEncypt
+  
+  void Encrypt(RandomNumberGenerator &rng, const byte *plainText, unsigned int plainTextLength, Integer & U, Integer & tag, Integer & encM);
+  {
+
+  }
+  void encrypt(byte const * M, unsigned int m_len, )
+  {
+    // plainText = M
+    Integer U; // paper's gu, freenet's C[0]
+    Integer tag; // macRes, freenet's C[1]
+    Integer encM; // freenet's C[2]
+
+    unsigned byte hash[H::DIGESTSIZE]; // paper's hv
+    
+    Integer u(rng, m_y.BitCount()); // XXX: is m_y.Bitcount the correct number of random bits?
+
+    RawEncrypt(u, U, tag, X);
+
+  }
+
+  RawEncrypt(Integer const & u, const byte * M, const byte Mlen, Integer & U, Integer & tag, Integer & encM) const
+  {
+    // m_y is paper's pk (public key)
+
+
+    Integer X; // freenet's guv
+
+    // XXX: could this be sped up by precomputation as in el gamal?
+    // yes, GDSADigestSigner::GDSADigestSigner(RandomNumberGenerator &rng, const Integer &pIn, const Integer &qIn, const Integer &gIn)
+
+    U = a_exp_b_mod_c(m_g, u, m_p);
+    X = a_exp_b_mod_c(m_y, u, m_p);
+
+    unsigned byte macKey[H::MLEN];
+    unsigned byte encKey[H::ELEN];
+    h(U, X, macKey, encKey);
+
+      
+    mac(encKey, M, Mlen, tag);
+    syme(macKey, M, Mlen, encM);
+  }
+};
+
+
+
+typedef DHIES_Generator<GDSADigestSigner> DHIES_DSA_Generator;
+typedef DHIES_Generator<ECSigner> DHIES_EC_Generator;
+
+
+template<class Verifier, class Signer>
+class DHIES_Signer
+{
+  void operator()(ECVerifier & publicKey, ECSigner & privateKey, byte * output, int outSize)
+  {
+  }
+};
+
+typedef DHIES_Secret<GDSADigestVerifier, GDSADigestSigner> DHIES_DSA_Secret;
+typedef DHIES_Secret<ECVerifier, ECSigner> DHIES_EC_Secret;
+
+
+
+template<class H>
+class DHIES_EC_Secret
+{
+public:
+  void operator()()
+  {
+    
+  }
+};
+
+template<class H>
+class DHIES_DSA_Secret
+{
+public:
+  void operator()(GDSADigestVerifier & publicKey, GDSADigestSigner & privateKey, byte * output, int outSize)
+  {
+    
+  }
+};
+
+template<class H>
+class DHIES_Freenet_Secret
+{
+public:
+  void operator()(GDSADigestVerifier & publicKey, GDSADigestSigner & privateKey, byte * output, int outSize)
+  {
+
+  }
+}
+
+
+//! This is 
+template<class H>
+class DHIES_DSA_Secret
+{
+public:
+  //! Length of MAC key in bytes
+  enum {MACKEYSIZE = 16};
+  
+  //! Length of symmetric encryption key in bytes
+  enum {ENCKEYSIZE = 16};
+  
+  DhiesHash(H & h) : h_(h)
+  {
+    assert(MACKEYSIZE + ENCKEYSIZE == H::DIGESTSIZE); // xxx: compile time assertion
+  }
+
+  void Calculate(Integer const & u, Integer const & v)
+  {
+    
+
+  }
+
+private:
+  H & h_;
+}
+
+private:
+}
+
+class DhiesFreenetHash
+{
+  //! Length of MAC key in bytes
+  enum { MLEN = 16 };
+
+  //! Length of symmetric encryption key in bytes
+  enum { ELEN = 16 };
+  void operator()(Integer const & a, Integer const & b, unsigned byte * macKey, unsigned byte * encKey)
+  {
+
+    // freenet uses last half of the hash bits for macKey unlike
+    // the original paper which uses the first half
+
+    // freenet uses first half of the hash bits for encKey unlike 
+    // the original paper which uses the last half
+    
+    byte out[MLEN + ELEN];
     SHA256 sha;
     sha.Update(U);
     sha.Update(X);
     sha.Final(out);
+    memcopy(out, macKey); //XXX:
+    memcopy(out, encKey);
   }
 }
 
-class Freenet_MAC
-{
-  enum { DIGESTSIZE = 16 };
-  
-  void operator()(byte const * hash, byte const * data, unsigned int size, Integer & out)
-  {
-    // freenet uses last half of the hash bits for macKey unlike
-    // the original paper which uses the first half
-    unsigned byte * macKey = hv + Freenet_H::DIGESTSIZE / 2;
-    HMAC<SHA> mac(macKey, Freenet_H::DIGESTSIZE / 2);
-    mac.Update(M, m_len);
-    unsigned byte bout[DIGESTSIZE];
-    MAC.Final(bout);
-    tag.Decode(out, DIGESTSIZE);
-  }
-}
 
-class Freenet_SYME
-{
-  enum { BLOCKSIZE = 16 } ;
-
-  void operator()(unsigned byte const * hash, unsigned byte const * data, unsigned int size, Integer & out)
-  {
-    // freenet uses first half of the hash bits for encKey unlike 
-    // the original paper which uses the last half
-    unsigned byte * encKey = hv;
-    RijndaelEncryption re(encKey, Freenet_H::DIGESTSIZE / 2);
-    unsigned byte iv[BLOCKSIZE];
-    memset(iv, 0, sizeof(iv));
-    PGP_CFBEncryption pe(re, iv);
-    vector<unsigned byte> bout(size);
-    pe.ProcessString(&bout[0], size);
-    out.Decode(&data[0], size);
-  }
-}
-
-class Freenet_GYP
-{
-  operator()(DSAPublicKey const & k, Integer const * G, Integer const * Y, Integer const * P)
-  {
-    G = &k.GetGenerator();
-    Y = &k.GetPublicResidue();
-    P = &k.GetModulus();    
-  }
-}
-
-template<class H, class SYME, class MAC, class GYP, class KEY>
-class Dhaes_Encryption
-{
-public:
-    enum { sym_keylen = 16, sym_blocklen = 16 };
-    
-    Dhaes_Encryption(H h_ = H(), SYME syme_ = SYME(), MAC mac_ = MC(), GYP gyp_ = GYP())
-    : h(h_), syme(syme_), mac(mac_), gyp(gyp_)
-    {
-    }
-
-    // U = gu = C[0]
-    // X = guv
-    // hash = hv
-    // tag = macRes = C[1]
-    // encM = C[2]
-    void encrypt(KEY const & k, byte const * M, unsigned int m_len, Integer & U, Integer & tag, Integer & encM)
-    {
-        const Integer *G, *Y, *P;
-        gyp(k, G, Y, P);
-
-        Integer u(r, pub_y.BitCount());
-        Integer U(a_exp_b_mod_c(*G, u, *P));
-        Integer X(a_exp_b_mod_c(*Y, u, *P));
-        
-        unsigned byte hash[H::DIGESTSIZE];
-        h(U, X, hash);
-        mac(hash, M, M_len, tag);
-        syme(hash, M, m_len, encM);
-    }
-}
 
 template<class H, class SYMD, class MAC, class GYP, class KEY>
-Dheas_Decryption
+DhiesDecryptor
 {
   bool decrypt(KEY const & key, Integer const & U, Integer const & tag, Integer const & encM, unsigned int M_len, Integer & m)
   {
