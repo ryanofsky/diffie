@@ -1,12 +1,9 @@
 #ifndef smart_pointer_hpp
 #define smart_pointer_hpp
 
-template<typename T, class ACTUAL = Unspecified, class BASE = Unspecified>
-class PointerManager : public BASE
+template<typename T, class ACTUAL, class BASE>
+class PointerManagerImpl : public BASE
 {
-  
-  typedef PointerManager<Unspecified> Identity;
-  typedef T Parameterization;
   typedef typename ACTUAL::Ownership Ownership;
   
 public:
@@ -31,12 +28,12 @@ protected:
     return t == 0;
   }
 
-  void ShallowCopy(PointerManager const & p)
+  void ShallowCopy(PointerManagerImpl const & p)
   {
     t = p.t;
   }
 
-  void DeepCopy(PointerManager const & p)
+  void DeepCopy(PointerManagerImpl const & p)
   {
     t = new T(p.t);
   }
@@ -59,15 +56,21 @@ protected:
   T * t;
 };
 
+template<typename T>
+struct PointerManager
+{
+  typedef PointerManager<Unspecified> Identity;
+  typedef T Parameterization;
+};
+
 template<>
 struct Specify< PointerManager<Unspecified> >
 {
   template<typename PARAMS, typename ACTUAL, typename BASE>
   struct Args
   {
-    typedef PointerManager<PARAMS, ACTUAL, BASE> Result;
+    typedef PointerManagerImpl<PARAMS, ACTUAL, BASE> Result;
   };
 };
 
 #endif
-
