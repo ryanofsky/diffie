@@ -49,20 +49,6 @@ struct FriendlySpec
   typedef Specialize<typename POLICY::Identity>::Params<typename POLICY::Params, ACTUAL, BASE>::Result Result;
 };
 
-template<class TYPE_LIST>
-struct PolicyHelper;
-
-template<>
-struct PolicyHelper<NullType>
-{
-  template<class ACTUAL>
-  struct Actual
-  {
-    typedef EmptyType Next;
-    typedef EmptyType Policy;
-  };
-};
-
 template<class P>
 struct GetP
 {
@@ -93,6 +79,7 @@ struct GetN<int>
   typedef EmptyType Result;
 };
 
+
 template<class TYPE_LIST>
 struct PolicyHelper
 {
@@ -100,12 +87,20 @@ struct PolicyHelper
   struct Actual
   {
     typedef PolicyHelper<typename TYPE_LIST::Tail>::Actual<ACTUAL> Next;
-    typedef GetP<Next>::Result np;
-
-    typedef FriendlySpec<typename TYPE_LIST::Head, ACTUAL, np >::Result Policy;
+    typedef FriendlySpec<typename TYPE_LIST::Head, ACTUAL, GetP<Next>::Result >::Result Policy;
   };
 };
 
+template<>
+struct PolicyHelper<NullType>
+{
+  template<class ACTUAL>
+  struct Actual
+  {
+    typedef EmptyType Next;
+    typedef EmptyType Policy;
+  };
+};
 
 /////////////////////////////////////////////////////////////////////////////
 // Testing Stuff
