@@ -69,8 +69,6 @@ public:
   void Open(...);
 };
 
-*/
-
 /* Define the HandlePolicy interface
 
 template<class ACTUAL = Unspecified, class BASE = Unspecified>
@@ -79,13 +77,23 @@ class HandlePolicy : public BASE::Chain<ACTUAL,
 public:
   template<class NEW_ACTUAL, class NEW_BASE>
   struct Specify { typedef HandleManager<NEW_ACTUAL, NEW_BASE> result; };
+
+  //! Reset ownership. Get in default state for non-nulln handle. called during open() or assignment from raw handle
+  void Reset();
   
+  //! take ownership
+  void Own() {}
   
+  //! returns true if was owned, false otherwise
+  bool Disown() {}
+  
+  //! returns true of owned, false otherwise
+  bool Owned() {}
 };
 
 */
 
-template<class, class> class SmartResource;
+//template<class, class> class SmartResource;
 
 /*
 
@@ -106,27 +114,41 @@ class MagicWrapper
 
 */
 
-template<class, class>
-struct asdf;
+//template<class, class>
+//struct asdf;
+
+template<typename HEAD, typename TAIL>
+struct List2
+{
+  typedef HEAD Head;
+  typedef TAIL Tail;
+};
 
 template<class MANAGER, class OWNERSHIP>
 class SmartResource : 
   public Magic
   <
     SmartResource<MANAGER, OWNERSHIP>,
-    List<OWNERSHIP, List<MANAGER, NullType> >
+    List2<OWNERSHIP, List<MANAGER, NullType> >
   >
 {
   typedef SmartResource<MANAGER, OWNERSHIP> ThisType;
   
+  typedef ::List2<MANAGER, NullType> a1;
+  typedef ::List<OWNERSHIP, a1> a2;
+
   typedef Magic
   <
     SmartResource<MANAGER, OWNERSHIP>,
-    asdf<OWNERSHIP, asdf<MANAGER, NullType> >
+    a2
   > magic;
   
-  typedef typename magic::Policy Policy;
-  typedef typename magic::Next::Policy Manager;
+  typedef typename magic::Policy Ownership;
+
+  typedef typename magic::Next a3;
+
+  //tempxxx: for vc
+  //typedef typename a3::Policy Manager;
   
 public:    
  
@@ -161,13 +183,16 @@ public:
       sa(*this, *src);
     }
   }
-  
+  // xxx: this overload won't work for vc, only allows
+  // a single declaration of operator=
+
   // xxx: use efficient pass
+  /*
   template<class ANYTHING_EXECPT_SMART_RESOURCE>
-  ThisType & operator=(ANYTHING_EXCEPT_SMART_RESOURCE arg)
+  ThisType & operator=(typename ANYTHING_EXECPT_SMART_RESOURCE arg)
   {
     Ownership::Swallow(arg);    
-  }
+  }*/
   
   ThisType copy()
   { 
@@ -205,21 +230,6 @@ public:
       SetNull();  
     }
   }
-};
-
-class HandlePolicy
-{
-  //! Reset ownership. Get in default state for non-nulln handle. called during open() or assignment from raw handle
-  void Reset();
-  
-  //! take ownership
-  void Own() {}
-  
-  //! returns true if was owned, false otherwise
-  bool Disown() {}
-  
-  //! returns true of owned, false otherwise
-  bool Owned() {}
 };
 
 #endif
