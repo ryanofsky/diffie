@@ -24,7 +24,7 @@ struct AppendImpl
   template<class LIST2>
   struct apply
   {
-    typedef List<LIST1::Head, AppendImpl<LIST1::Tail>::apply<LIST2>::type > type;
+    typedef List<typename LIST1::Head, AppendImpl<typename LIST1::Tail>::apply<LIST2>::type > type;
   };
 };
 
