@@ -152,41 +152,6 @@ struct GetPolicy2
 //   return List<TopClass, NullType>;
 //
 
-
-// Notes:
-//
-// Purpose of chaining: Allow policies to be themselves composed of policies
-//   Chained policies should not be on the returned inheritance list
-
-template<class ACTUAL, class POLICIES>
-struct ChainData
-{
-  typedef ACTUAL Actual;
-  typedef POLICIES Policies;
-};
-
-template<class CHAIN, class EMBEDDED_CHAIN>
-struct PolicyChainReturn
-{
-  typedef CHAIN_DATA Chain;
-  typedef EMBEDDED_CHAIN_DATA EmbeddedChain;
-};
-
-
-
-template<class TYPE_LIST>
-struct PolicyChainImpl
-{
-  template<class ACTUAL>
-  struct apply
-  {
-    typedef type;
-  };
-}
-
-template<>
-struct PolicyChainImpl<NullType>
-
 template<class TYPE_LIST>
 struct PolicyChainImpl
 {  
@@ -311,7 +276,6 @@ struct PolicyClass : public
   }
 };
 
-
 int main()
 {
   typedef List<int, List<char, NullType> > List1;
@@ -322,7 +286,7 @@ int main()
   
   return 0;
   
-  
+ /* 
   typedef PolicyClass<UpperPolicy, LowerPolicy> P;
 
   P p;
@@ -335,7 +299,6 @@ int main()
   
   p.upperGo();
   p.lowerGo();
-
+*/
   return 0;
 }
-
