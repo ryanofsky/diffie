@@ -41,35 +41,33 @@ template<typename ACTUAL, typename LIST, typename TERMINAL_BASE>
 struct MagicBrains
 {
 private:
-  typedef typename LIST::Head::Params abc123;
-  typedef typename LIST::Tail ltail;
-
   template<typename MAGIC_BASE>
   struct Spec
   {
-    typedef typename Specify<typename LIST::Head::Identity>::Args<typename LIST::Head::Params, ACTUAL, MAGIC_BASE >::Result Result;
+    typedef typename Specify<typename LIST::Head::Identity>::Args<typename LIST::Head::Parameterization, ACTUAL, MAGIC_BASE >::Result Result;
   };
 
   // is this the end of the list? (no)
   template<typename TAIL CPP_FORCE_PARTIAL_TARG>
-  struct Tail : public Spec< Magic<ACTUAL, ltail, TERMINAL_BASE> >::Result
+  struct Tail : public Spec< Magic<ACTUAL, LIST::Tail, TERMINAL_BASE> >::Result
   {
-    typedef Magic<ACTUAL, ltail, TERMINAL_BASE> magic;
-    //XXX: gcc says Spec is not a template class?
-    ////typedef Spec< magic >::Result Policy;
+    typedef Magic<ACTUAL, LIST::Tail, TERMINAL_BASE> magic;
+    typedef Spec< magic >::Result Policy;
     typedef typename magic::TheTail Next;
   };
  
   // is this the end of the list? (yes)
   template<CPP_FORCE_PARTIAL>
-  struct Tail<NullType CPP_FORCE_PARTIAL_ARG> : public Spec< NoMagic<TERMINAL_BASE> >::Result
+  struct Tail<NullType CPP_FORCE_PARTIAL_ARG> //: public Spec< NoMagic<TERMINAL_BASE> >::Result
   {
     typedef NoMagic<TERMINAL_BASE> magic;
-    //xxx: typedef Spec< magic >::Result Policy;
+    typedef Spec<magic> sd;
+    //typedef Specify<typename LIST::Head::Identity>::Args<typename LIST::Head::Parameterization, ACTUAL, magic >::Result sd;
+    typedef sd::Result Policy;
     typedef NullType Next;
   };
 
-  typedef Tail<typename LIST::TAIL> Result;
+  typedef Tail<typename LIST::Tail> Result;
 };
 
 template<typename ACTUAL, typename LIST, typename TERMINAL_BASE = EmptyBase>
@@ -80,8 +78,8 @@ struct Magic : public MagicBrains<ACTUAL, LIST, TERMINAL_BASE>::Result
   typedef ACTUAL Actual;
   typedef LIST List;
   typedef MagicBrains<ACTUAL, LIST, TERMINAL_BASE>::Result TheTail;
-  typedef typename TheTail::Next Next;
-  typedef typename TheTail::Policy Policy;
+  typedef TheTail::Next Next;
+  typedef TheTail::Policy Policy;
 };
 
 template<typename TERMINAL_BASE>
