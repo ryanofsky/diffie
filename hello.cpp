@@ -1,6 +1,73 @@
 #include <iostream>
+#include <boost/type_traits.hpp>
+
+namespace detail
+{
+  template<class T>
+  struct msvc_never_true
+  {
+    struct fake_type;
+    BOOST_STATIC_CONSTANT(bool, value = (boost::is_same<T, fake_type>::value));
+    //enum { value = false };
+  };
+};
+
+template<typename Allocator, typename T>
+struct foo
+{
+  template<bool>
+  struct Allocator_wrapper : Allocator
+  {};
+  
+  template<>
+  struct Allocator_wrapper<true> : Allocator
+  {
+    template<class> struct rebind;
+  };
+  
+  typedef 
+    typename Allocator_wrapper
+    <
+      detail::msvc_never_true<Allocator>::value
+    >::template rebind<T>
+ 
+  allocator_type;
+};
+
+
+
+
+
+struct LowerPolicy
+{
+  template<class ACTUAL>
+  struct rebind
+  {
+    void go()
+    {
+      cout << typeid(ACTUAL).name() << endl;
+    }
+  };
+};
+
 
 using namespace std;
+
+template<class T>
+struct abc
+{
+  //typedef T::template rebind<int> dfg;
+  typedef foo<T, int>::allocator_type dfg;
+};
+
+void main()
+{
+  typedef abc<LowerPolicy>::dfg sdf;
+  sdf k;
+  k.go();
+};
+
+/*
 
 /////////////////////////////////////////////////////////////////////////////
 // GENERAL STUFF
@@ -216,8 +283,8 @@ struct PolicyClass : public
   }
 };
 
-
-
+*/
+/*
 int main()
 {
   typedef PolicyClass<UpperPolicy, LowerPolicy> P;
@@ -236,5 +303,5 @@ int main()
   return 0;
 }
 
-
+*/
 
