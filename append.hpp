@@ -30,7 +30,7 @@ struct AppendImpl
     typedef List
       <
         typename LIST1::Head,
-        typename next::type
+        typename TGET_type(next)
       > type;
   };
 };
