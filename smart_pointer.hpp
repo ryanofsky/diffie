@@ -1,15 +1,20 @@
 #ifndef smart_pointer_hpp
 #define smart_pointer_hpp
 
-template<typename T>
-class PointerManager
+template<typename T, class ACTUAL = Unspecified, class BASE = Unspecified>
+class PointerManager : public BASE
 {
+  
+  typedef PointerManager<Unspecified> Identity;
+  typedef T Parameterization;
+  typedef typename ACTUAL::Ownership Ownership;
+  
 public:
 
   T * leak()
   {
     T * ret(p);
-    OWNERSHIP * o = (OWNERSHIP *)this;
+    Ownership * o = (Ownership *)this;
     o->Disown();
     return ret;
   }
@@ -33,20 +38,20 @@ protected:
 
   void DeepCopy(PointerManager const & p)
   {
-    t = new PointerType(p.t)
+    t = new T(p.t);
   }
 
   void Close()
   {
-    delete T;
+    delete t;
   }
 
-  PointerType & operator->()
+  T & operator->()
   {
     return *t;
   }
 
-  PointerType * operator*()
+  T * operator*()
   {
     return t;
   }
@@ -54,4 +59,15 @@ protected:
   T * t;
 };
 
+template<>
+struct Specify< PointerManager<Unspecified> >
+{
+  template<typename PARAMS, typename ACTUAL, typename BASE>
+  struct Args
+  {
+    typedef PointerManager<PARAMS, ACTUAL, BASE> Result;
+  };
+};
+
 #endif
+
