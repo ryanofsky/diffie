@@ -1,6 +1,9 @@
 #ifndef policy_hpp
 #define policy_hpp
 
+#include "general.hpp"
+#include "append.hpp"
+
 #ifdef SIMPLE
 
 //////////////////////// Revision 1, No Chaining or Custom Inheritance
@@ -76,7 +79,7 @@ struct PolicyChain
 ////////////////////// Revision 2, Chaining and halfway to Custom Inheritance
 
 template<class INHERIT>
-class TopType
+struct TopType
 {
   void topGo()
   {
@@ -85,11 +88,20 @@ class TopType
   };
 };
 
+template<>
+struct TopType<NullType>
+{
+  void topGo()
+  {
+    std::cout << "TOP: Nothing will be inherited " << std::endl;
+  };
+};
+
 // put vc++ workaround here
-template<class POLICY, class ACTUAL, class BASE>
+template<class POLICY, class ACTUAL, class BASE, class CHAIN>
 struct GetPolicy3
 {
-  typedef typename POLICY::template Policy<ACTUAL, BASE> type;
+  typedef typename POLICY::template Policy<ACTUAL, BASE, CHAIN> type;
 };
 
 
@@ -119,7 +131,7 @@ struct GetPolicy3
 //     < POLICIES::Tail,
 //       ACTUAL,
 //       List<policy:Policies, EMBEDDED_POLICIES>,
-//       Append<policy::Inherits, INHERITS>
+//       Append<policy::Inherits, INHERITS>::type
 //     >;
 //   
 //   // instantiate policy
@@ -160,24 +172,25 @@ struct PolicyChainImpl /* 1 */
    struct apply
    {
      typedef typename POLICIES::Head policy;
+
      typedef PolicyChainImpl
        < typename POLICIES::Tail                     /* POLICIES */
        >::apply
        < ACTUAL,                                     /* ACTUAL */
-         List                                        /* EMBEDDED_POLICIES */,
+         List                                        /* EMBEDDED_POLICIES */
          < typename policy::Policies, 
            EMBEDDED_POLICIES
          >, 
-         Append<typename policy::Inherits, INHERITS> /* INHERITS */
+         typename Append<typename policy::Inherits, INHERITS>::type /* INHERITS */
        > next;
 
      // instantiate policy
      typedef GetPolicy3
        < policy,
          ACTUAL,
-         typename next::Chain::Head,
-         typename next::EmbeddedChain::Head
-       > object;
+         next::Chain::Head,
+         next::EmbeddedChain::Head
+       >::type object;
 
      // return values
      typedef List<object, typename next::Chain> Chain;
@@ -192,7 +205,7 @@ struct PolicyChainImplEnd /* 4 */
   struct apply
   {
     typedef PolicyChainImpl
-      < typename EMBEDDED_POLICIES::Head, /* POLICIES */
+      < typename EMBEDDED_POLICIES::Head  /* POLICIES */
       >::apply
       < ACTUAL,                           /* ACTUAL */
         typename EMBEDDED_POLICIES::Tail, /* EMBEDDED_POLICIES */
@@ -223,7 +236,7 @@ struct PolicyChainImpl<NullType> /* 2 */
   struct apply
   {
     typedef PolicyChainImplEnd
-      < EMBEDDED_POLICIES,       /* EMBEDDED_POLICIES */
+      < EMBEDDED_POLICIES        /* EMBEDDED_POLICIES */
       >::apply
       < ACTUAL,                  /* ACTUAL */
         INHERITS                 /* INHERITS */
