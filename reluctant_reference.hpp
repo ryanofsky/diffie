@@ -1,34 +1,14 @@
 #ifndef smart_assign_hpp
 #define smart_assign_hpp
 
-#include "SmartAssign.hpp"
+#include "policies.hpp"
+#include "smart_assign.hpp"
 
-template<>
-class SmartAssign<ReluctantReferenceCount, ReluctantReferenceCount>
+template<class ACTUAL = Unspecified, class BASE = Unspecified>
+class ReluctantReferenceCount : public BASE
 {
-  // Is it legal to be friends with an unparamaterized class
-  friend class SmartAssign;
-  
-  // XXX: are these even neccessary?
-  typedef ReluctantReferenceCount SOURCE_OWNERSHIP;
-  typedef ReluctantReferenceCount DESTINATION_OWNERSHIP;
-  
-  template<SOURCE_MANAGER, DESTINATION_MANAGER>
-  operator()(SOURCE_OWNERSHIP<SOURCE_MANAGER> const & src, DESTINATION_OWNERSHIP<DESTINATION_MANAGER> & dest)
-  {
-    counter = r.counter;
-    if (counter == TRANSFER) // if transfer
-      r.counter = ACCESS;
-    else if (counter != ACCESS) // if refcount
-      ++*counter;
-  }
-};
-
-template<class MANAGER>
-class ReluctantReferenceCount : public MANAGER
-{
-  typedef ReluctantReferenceCount<MANAGER> OWNERSHIP;
-  enum { ACCESS = 0; TRANSFER = ~ACCESS };
+  typedef typename ACTUAL::Ownership Ownership;
+  enum { ACCESS = 0, TRANSFER = ~ACCESS };
 
   ReluctantReferenceCount() : counter(ACCESS) {}
 
@@ -78,4 +58,19 @@ protected:
   mutable int * counter;
 };
 
+template<class, class> struct SmartAssign;
+
+template<>
+struct SmartAssign<ReluctantReferenceCount<>, ReluctantReferenceCount<> >
+{
+  template<class DESTINATION, class SOURCE>
+  void operator()(DESTINATION & dest, SOURCE const & src)
+  {    
+    dest.counter = src.counter;
+    if (dest.counter == TRANSFER) // if transfer
+      src.counter = ACCESS;
+    else if (dest.counter != ACCESS) // if refcount
+      ++*dest.counter;
+  };
+};
 #endif
