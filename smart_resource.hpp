@@ -1,46 +1,13 @@
 #ifndef smart_resource
 #define smart_resource
 
-class EmptyBase {};
-
-// for all 
-//   BASE - type that this class should inherit from
-//   ACTUAL - type that has inherited from this cilass. this pointer can be cast to ACTUAL *
-//            to emulate having compile-time virtual method call
-//   PARAMS - a class filled with enum's and typedefs that can be used to configure the behavior
-//            of this class. the PARAM class is just a way of stuffing a large number of template
-//            parameters into a single argument. 
-
-template<class ACTUAL, class BASE = EmptyBase>
-class HandleManager : public EmptyBase
+template<class ACTUAL = Unspecified, class BASE = Unspecified>
+class TopManager
 {
-  typedef Base<> Manager;
-  typedef HandleManager<ACTUAL> MANAGER;
 public:
-  enum { HAS_NULLCHECKING = true };
-  enum { HAS_OWNERSHIPCHECKING = true };
 
-  //! Required by all
-  void ShallowCopy(HandleManager const & HandleManager);
-  void Close();
-  
-  //! Optional (set HAS_NULLCHECKING to true if present)
-  void SetNull();
-  bool IsNull();
-
-  //! Optional (set HAS_OWNERSHIPCHECKING to false if present)
-  void Disown();
-  bool Owns();
-  
-  //! Required for COW, Duplicate
-  DeepCopy();
-
-  //! Required for intrusive count
-  AddRef();
-  DeleteRef();
-  
-  //! 
-  void Swallow(OneArg);
+  template<class NEW_ACTUAL, class NEW_BASE>
+  struct Specify { typedef HandleManager<NEW_ACTUAL, NEW_BASE> Result; };
 
 protected:  
 
@@ -81,26 +48,85 @@ protected:
       this.own();
     }
   }
-
-  Handle handle_;
 };
 
-// optimization question
-// will compilers go from:
-//   inline bool f() { return false; }
-//   if (f()) cout << "A"; else cout << "B";
-// cout << "B";
-// check it out for metrowerks and visual c++
+// for all 
+//   BASE - type that this class should inherit from
+//   ACTUAL - type that has inherited from this cilass. this pointer can be cast to ACTUAL *
+//            to emulate having compile-time virtual method call
+//   PARAMS - a class filled with enum's and typedefs that can be used to configure the behavior
+//            of this class. the PARAM class is just a way of stuffing a large number of template
+//            parameters into a single argument. 
 
-template<class MANAGER, class POLICY>
-class SmartResource : protected POLICY<MANAGER>
+template<class ACTUAL = Unspecified, class BASE = Unspecified>
+class HandleManager : public TopManager<ACTUAL, SomeBaseClass>
 {
+public:
+
+  template<class NEW_ACTUAL, class NEW_BASE>
+  struct Specify { typedef HandleManager<NEW_ACTUAL, NEW_BASE> result; };
+  
+  enum { HAS_NULLCHECKING = true };
+  enum { HAS_OWNERSHIPCHECKING = true };
+
+  //! Required by all
+  void ShallowCopy(HandleManager const & HandleManager);
+  void Close();
+  
+  //! Optional (set HAS_NULLCHECKING to true if present)
+  void SetNull();
+  bool IsNull();
+
+  //! Optional (set HAS_OWNERSHIPCHECKING to true if present)
+  void Disown();
+  bool Owns();
+  
+  //! Required for COW, Duplicate
+  DeepCopy();
+
+  //! Required for intrusive count
+  AddRef();
+  DeleteRef();
+  
+  //! Used to assign
+  void Swallow(OneArg);
+  
+  //! Open
+  void Open(...)
+
+};
+
+template<class ACTUAL = Unspecified, class BASE = Unspecified>
+class HandlePolicy : public BASE::Chain<ACTUAL, 
+{
+public:
+  template<class NEW_ACTUAL, class NEW_BASE>
+  struct Specify { typedef HandleManager<NEW_ACTUAL, NEW_BASE> result; };
+  
+  
+};
+
+template<class ARG_MANAGER, class ARG_POLICY>
+class SmartResource : 
+  public ARG_POLICY::Chain
+  <
+  
+    SmartResource<ARG_MANAGER, ARG_POLICY>, 
+    Payload< List< ARG_POLICY, List< ARG_POLICY, List< TopManager, NullType> > > > 
+  
+  >::Result
+  
+
+{
+  
+  
   typedef SmartResource<MANAGER, POLICY> THIS;
   typedef POLICY<MANAGER> BaseType;
   typedef SmartResource<MANAGER, POLICY> ThisType;
 
+  
 public:    
-
+ 
   SmartResource() : BaseType() {}
   ~SmartResource() { BaseType::Discard(); } 
 
