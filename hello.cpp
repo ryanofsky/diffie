@@ -19,25 +19,31 @@ struct false_c
   enum { value = false };
 };
 
-template<typename POLICY, typename ACTUAL, typename BASE>
+struct Prototype
+{
+  template<class a, class b> struct Policy;
+};
+
+template<typename POLICY, typename PROTOTYPE>
 struct Workaround
 {
   template<bool>
-  struct Helper : POLICY
-  {};
-  
+  struct Helper;
+
   template<>
-  struct Helper<true> : POLICY
+  struct Helper<true> : Prototype
   {
-    template<class a, class b> struct Policy;
   };
-  
-  typedef Helper<false_c<POLICY>::value>::template Policy<ACTUAL, BASE> type;
+
+  template<>
+  struct Helper<false> : public POLICY
+  {
+  };  
+
+
+
+  typedef Helper<false_c<POLICY>::value> type;
 };
-
-
-
-
 
 struct LowerPolicy
 {
@@ -51,14 +57,13 @@ struct LowerPolicy
   };
 };
 
-
 using namespace std;
 
 template<class T>
 struct abc
 {
-  //typedef T::template Policy<int> dfg;
-  typedef Workaround<T, T, T>::type dfg;
+  typedef Workaround<T, Prototype>::type t2;
+  typedef t2::template Policy<T, int> dfg;
 };
 
 void main()
