@@ -1,6 +1,8 @@
 #ifndef append_hpp
 #define append_hpp
 
+#include "workaround.hpp"
+
 // Function:     Append(LIST1, LIST2)
 //
 // Purpose:      Appends LIST2 to LIST1 by returning a copy of LIST1 with its 
@@ -24,7 +26,12 @@ struct AppendImpl
   template<class LIST2>
   struct apply
   {
-    typedef List<typename LIST1::Head, AppendImpl<typename LIST1::Tail>::apply<LIST2>::type > type;
+    typedef TGET_1apply(AppendImpl<typename LIST1::Tail>, LIST2) next; 
+    typedef List
+      <
+        typename LIST1::Head,
+        typename next::type
+      > type;
   };
 };
 
@@ -54,8 +61,8 @@ struct Append
 //               else 
 //                 return Append(LIST1, LIST2);
 //
-//              This function obviates the need for a list traversal when
-//              LIST2 is null.
+//              This function is the same as Append(), but it prevents a list
+//              traversal when LIST2 is null.
 
 template<class LIST2>
 struct EfficientAppendImpl
@@ -63,7 +70,8 @@ struct EfficientAppendImpl
   template<class LIST1>
   struct apply
   {
-    typedef AppendImpl<LIST1>::apply<LIST2>::type type;
+    typedef AppendImpl<LIST1>::apply<LIST2> partial;
+	typedef TGET_type(partial) type;
   };
 };
 
