@@ -166,15 +166,7 @@ struct PolicyHelpImpl<NullType>
 };
 
 template<class ACTUAL, class TYPE_LIST>
-struct FriendlyPolicyHelpImpl
-{
-  typedef PolicyHelpImpl<TYPE_LIST> a1;
-  typedef a1::Actual<ACTUAL> a2;
-  typedef a2::Policy Result;
-};
-
-template<class ACTUAL, class TYPE_LIST>
-struct PolicyHelper : FriendlyPolicyHelpImpl<ACTUAL, TYPE_LIST>::Result
+struct PolicyHelper : PolicyHelpImpl<TYPE_LIST>::Actual<ACTUAL>::Policy
 {
   typedef PolicyHelpImpl<TYPE_LIST>::Actual<ACTUAL> Impl;
   typedef Impl::Policy Policy;
