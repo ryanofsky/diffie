@@ -5,10 +5,9 @@ template<class ACTUAL = Unspecified, class BASE = Unspecified>
 class TopManager
 {
 public:
-
-  template<class NEW_ACTUAL, class NEW_BASE>
-  struct Specify { typedef HandleManager<NEW_ACTUAL, NEW_BASE> Result; };
-
+  typedef TopManager<> Identity;
+  typedef NullType Parameterization;
+  
 protected:  
 
   void CopyForWrite()
@@ -34,7 +33,6 @@ protected:
   
   void PreOpen()
   {
-    
   }
 
   template<class ARG_OWNERSHIP>
@@ -108,19 +106,12 @@ public:
 
 template<class ARG_MANAGER, class ARG_POLICY>
 class SmartResource : 
-  public ARG_POLICY::Chain
+  public Magic
   <
-  
-    SmartResource<ARG_MANAGER, ARG_POLICY>, 
-    Payload< List< ARG_POLICY, List< ARG_POLICY, List< TopManager, NullType> > > > 
-  
-  >::Result
-  
-
+    SmartResource<ARG_MANAGER, ARG_POLICY>,
+    List<ARG_POLICY, LIST<ARG_MANAGER, NullType> >
+  >
 {
-  
-  
-  typedef SmartResource<MANAGER, POLICY> THIS;
   typedef POLICY<MANAGER> BaseType;
   typedef SmartResource<MANAGER, POLICY> ThisType;
 
