@@ -4,6 +4,8 @@
 #include "smart_pointer.hpp"
 #include "smart_resource.hpp"
 
+using namespace std;
+
 class Abc
 {
 public:
@@ -18,8 +20,29 @@ public:
   }
 };
 
+template<class MANAGER>
+class DumpResource :
+  public Magic
+  <
+    DumpResource<MANAGER>,
+    List<MANAGER, NullType>
+  >
+{
+};
+
 void main()
 {
-  //SmartResource<PointerManager<Abc>, ReluctantReference<> > a;
+//  DumpResource< PointerManager<Abc> > n;
+  MagicBrains<DumpResource<PointerManager<Abc> >, List<PointerManager<Abc>, NullType>, EmptyBase>::Spec<NoMagic<EmptyBase> >
+  a;
+
+  //MagicBrains<DumpResource<PointerManager<Abc> >, List<PointerManager<Abc>, NullType>, EmptyBase>::Tail<NullType, Unspecified>::sd
+ // b;
+
+  
+  MagicBrains<DumpResource<PointerManager<Abc> >, List<PointerManager<Abc>, NullType>, EmptyBase>::Tail<NullType, Unspecified>
+  c;
+  
+  //SmartResource<PointerManager<Abc>, ReluctantReferenceCount > a;
   //a = new Abc();
 };
