@@ -3,7 +3,7 @@
 
 // some primitives
 struct Unspecified;
-struct EmptyBase {};
+struct EmptyBase{};
 struct NullType;
 struct True;
 struct False;
