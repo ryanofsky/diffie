@@ -4,7 +4,7 @@
 // some primitives
 struct Unspecified;
 struct EmptyBase {};
-struct Null;
+struct NullType;
 struct True;
 struct False;
 
@@ -73,7 +73,7 @@ private:
  
   // is this the end of the list? (yes)
   template<>
-  struct Tail<Null> : public Specify<LIST::Head::Identity>::Args< LIST::Head::Params, ACTUAL, NoMagic<TERMINAL_BASE> >::Result
+  struct Tail<NullType> : public Specify<LIST::Head::Identity>::Args< LIST::Head::Params, ACTUAL, NoMagic<TERMINAL_BASE> >::Result
   {
   };
 
@@ -152,6 +152,5 @@ public:
 template<typename MAGIC, typename TERMINAL_BASE>
 struct DoubleInherit : DoubleInheritBrains<MAGIC, TERMINAL_BASE>::Result
 { };
-
 
 #endif
