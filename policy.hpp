@@ -1,75 +1,8 @@
 #ifndef policy_hpp
 #define policy_hpp
 
-#include "general.hpp"
+#include "typelist.hpp"
 #include "append.hpp"
-
-#ifdef SIMPLE
-
-//////////////////////// Revision 1, No Chaining or Custom Inheritance
-
-// Function:     PolicyChainImpl<TYPE_LIST, ACTUAL>
-// Purpose:
-// Requirements: TYPE_LIST is a typelist (possibly NULL), ACTUAL
-//               should be the type of the policy class which
-//               is at the very bottom of the inheritance chain.
-//               the value of ACTUAL is ignored by this function,
-//               it is only passed as an argument each policy class
-//               on the chain. The TYPE_LIST must consist of policy
-//               classes only. All policy classes will have inner
-//               templated classes that look like:
-//
-//                 template<class ACTUAL, class BASE>
-//                 struct Policy : public BASE
-//                 {
-//                   // policies' methods, typedefs, and members
-//                   // defined here...
-//                 };
-//
-// Pseudocode:
-// if (TYPE_LIST == NullType)
-// {
-//   NextList = PolicyChainImpl<TYPE_LIST::next, ACTUAL>;
-//   Policy = TYPE_LIST::item::apply<ACTUAL, Next::item>;
-//   return List<Policy, NextList>;
-// }
-// else
-//   return List<TopClass, NullType>;
-//
-
-template<class TYPE_LIST>
-struct PolicyChainImpl
-{
-  template<class ACTUAL>
-  struct apply
-  {
-    typedef PolicyChainImpl<typename TYPE_LIST::next>::template apply<ACTUAL> Next;
-    typedef GetPolicy2<typename TYPE_LIST::item, ACTUAL, typename Next::Policy>::type Policy;
-  };
-};
-
-template<>
-struct PolicyChainImpl<NullType>
-{
-  template<class ACTUAL>
-  struct apply
-  {
-    typedef EmptyType Next;
-    typedef EmptyType Policy;
-  };
-};
-
-template<class ACTUAL, class TYPE_LIST>
-struct PolicyChain
-{
-  typedef PolicyChainImpl<TYPE_LIST>::apply<ACTUAL> Helper;
-  typedef typename Helper::Policy type;
-  typedef Helper::Next Next;
-};
-
-#else
-
-////////////////////// Revision 2, Chaining and halfway to Custom Inheritance
 
 template<typename A, typename B>
 struct DoubleInherit : public A, public B
@@ -286,6 +219,13 @@ struct PolicyChainImpl<NullType> /* 2 */
   };
 };
 
-#endif
+#define CALL_PolicyChain(POLICIES, ACTUAL, INHERITS) PolicyChainImpl<POLICIES>::template apply<ACTUAL, NullType, INHERITS>
+
+template<class ACTUAL, class POLICIES, class INHERITS = NullType>
+struct PolicyAssembler
+  : public TGET_item(TGET_Chain(CALL_PolicyChain(POLICIES, ACTUAL, INHERITS)))
+{
+  typedef typename TGET_Chain(CALL_PolicyChain(POLICIES, ACTUAL, INHERITS)) Chain;
+};
 
 #endif
