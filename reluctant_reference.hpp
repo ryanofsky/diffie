@@ -4,13 +4,13 @@
 #include "policies.hpp"
 #include "smart_assign.hpp"
 
-template<class ACTUAL = Unspecified, class BASE = Unspecified>
-class ReluctantReferenceCount : public BASE
+template<class ACTUAL, class BASE>
+class ReluctantReferenceCountImpl : public BASE
 {
   typedef typename ACTUAL::Ownership Ownership;
   enum { ACCESS = 0, TRANSFER = ~ACCESS };
 
-  ReluctantReferenceCount() : counter(ACCESS) {}
+  ReluctantReferenceCountImpl() : counter(ACCESS) {}
 
 public:
 
@@ -58,8 +58,25 @@ protected:
   mutable int * counter;
 };
 
-template<class, class> struct SmartAssign;
+class ReluctantReferenceCount
+{
+  typedef ReluctantReferenceCount Identity;
+  typedef EmptyBase Parameterization;
+};
 
+template<>
+struct Specify<ReluctantReferenceCount>
+{
+  template<typename PARAMS, typename ACTUAL, typename BASE>
+  struct Args
+  {
+    typedef ReluctantReferenceCountImpl<ACTUAL, BASE> Result;
+  };
+};
+
+//template<class, class> struct SmartAssign;
+
+/*
 template<>
 struct SmartAssign<ReluctantReferenceCount<>, ReluctantReferenceCount<> >
 {
@@ -73,4 +90,6 @@ struct SmartAssign<ReluctantReferenceCount<>, ReluctantReferenceCount<> >
       ++*dest.counter;
   };
 };
+*/
+
 #endif
