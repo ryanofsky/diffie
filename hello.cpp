@@ -1,110 +1,72 @@
 #include <iostream>
-#include <boost/type_traits.hpp>
-
-// Workaround for the "heinous VC typedef dependent template parameter bug"
-// mentioned in:
-// 
-//   http://lists.boost.org/MailArchives/boost/msg13628.php
-//   http://lists.boost.org/MailArchives/boost/msg20915.php
-//   http://lists.boost.org/MailArchives/boost/msg21642.php
-//   http://lists.boost.org/MailArchives/boost/msg21647.php
-//
-//
-
-
-
-template<class T>
-struct false_c
-{
-  enum { value = false };
-};
-
-struct Prototype
-{
-  template<class a, class b> struct Policy;
-};
-
-template<typename POLICY, typename PROTOTYPE>
-struct Workaround
-{
-  template<bool>
-  struct Helper;
-
-  template<>
-  struct Helper<true> : Prototype
-  {
-  };
-
-  template<>
-  struct Helper<false> : public POLICY
-  {
-  };  
-
-
-
-  typedef Helper<false_c<POLICY>::value> type;
-};
-
-struct LowerPolicy
-{
-  template<class ACTUAL, class Base>
-  struct Policy
-  {
-    void go()
-    {
-      cout << typeid(ACTUAL).name() << endl;
-    }
-  };
-};
+#include <typeinfo>
 
 using namespace std;
-
-template<class T>
-struct abc
-{
-  typedef Workaround<T, Prototype>::type t2;
-  typedef t2::template Policy<T, int> dfg;
-};
-
-void main()
-{
-  typedef abc<LowerPolicy>::dfg sdf;
-  sdf k;
-  k.go();
-};
-
-/*
 
 /////////////////////////////////////////////////////////////////////////////
 // GENERAL STUFF
 
-#define GCC
-#ifdef GCC
-#define CPP_FORCE_PARTIAL_TARG  , typename EXTRA = Unspecified
-#define CPP_FORCE_PARTIAL_ARG   , EXTRA
-#define CPP_FORCE_PARTIAL       typename EXTRA
-#else
-#define CPP_FORCE_PARTIAL_TARG
-#define CPP_FORCE_PARTIAL_ARG
-#define CPP_FORCE_PARTIAL
-#endif
-
 struct NullType;
 struct EmptyType{};
 
-struct ThisClassShouldNeverBeAParameter
+template<class HEAD, class TAIL>
+struct List
 {
-  typedef ThisClassShouldNeverBeAParameter Result;
+  typedef HEAD Head;
+  typedef TAIL Tail;
 };
 
-template<class IDENTITY>
-struct Specialize
+template<class INHERIT>
+class TopType
 {
-  template<class PARAMS, class ACTUAL, class BASE>
-  struct Params
+  void topGo()
   {
-    typedef ThisClassShouldNeverBeAParameter Result;
+    cout << "TOP: Here's the list of classes that will be inherited "
+         << typeid(INHERIT).name() << endl;
   };
+};
+
+
+// Function:     AppendImpl(LIST1, LIST2)
+//
+// Purpose:      Appends LIST2 to LIST1 by returning a copy of LIST1 with its 
+//               null terminator replaced by LIST2
+//
+// Requirements: LIST1 and LIST2 are typelists (although either or both can be
+//               null)
+//
+// Pseudocode:   if (LIST1 != NullType)
+//                 return List<LIST1::Head, AppendImpl(LIST1::Tail, LIST2)
+//               else
+//                 return LIST2;
+
+template<class LIST1>
+struct AppendImpl
+{
+  template<class LIST2>
+  struct apply
+  {
+    typedef List<LIST1::Head, AppendImpl<LIST1::Tail>::apply<LIST2>::type > type;
+  };
+};
+
+template<>
+struct AppendImpl<NullType>
+{
+  template<class LIST2>
+  struct apply
+  {
+    typedef LIST2 type;
+  };
+};
+
+// Append the LIST2 to LIST1.
+// Procedure: 
+
+template<class LIST1, class LIST2>
+struct Append
+{
+  typedef AppendImpl<LIST1>::apply<LIST2>::type type;
 };
 
 template<class HEAD, class TAIL>
@@ -114,169 +76,127 @@ struct TypeList
   typedef TAIL Tail;
 };
 
-// this level of indirection to the Specialize class 
-// is need by VC6 to avoid error C2510
+// put vc++ workaround here
 template<class POLICY, class ACTUAL, class BASE>
-struct FriendlySpec
+struct GetPolicy2
 {
-  typedef Specialize<typename POLICY::Identity>::Params<typename POLICY::Params, ACTUAL, BASE>::Result Result;
+  typedef typename POLICY::template Policy<ACTUAL, BASE> type;
 };
 
-template<class P>
-struct GetP
-{
-  typedef P::Policy Result;
-};
-
-template<>
-struct GetP<int>
-{
-  typedef EmptyType Result;
-};
-
-template<>
-struct GetP<EmptyType>
-{
-  typedef EmptyType Result;
-};
-
-template<class P>
-struct GetN
-{
-  typedef P::Next Result;
-};
-
-template<>
-struct GetN<int>
-{
-  typedef EmptyType Result;
-};
-
+//
 
 template<class TYPE_LIST>
-struct PolicyHelper
-{
+struct PolicyChainImpl
+{  
   template<class ACTUAL>
-  struct Actual
+  struct apply
   {
-    typedef PolicyHelper<typename TYPE_LIST::Tail>::Actual<ACTUAL> Next;
-    typedef FriendlySpec<typename TYPE_LIST::Head, ACTUAL, GetP<Next>::Result >::Result Policy;
+    typedef PolicyChainImpl<typename TYPE_LIST::Tail>::template apply<ACTUAL> Next;
+    typedef GetPolicy2<typename TYPE_LIST::Head, ACTUAL, typename Next::Policy>::type Policy;
   };
 };
 
 template<>
-struct PolicyHelper<NullType>
+struct PolicyChainImpl<NullType>
 {
   template<class ACTUAL>
-  struct Actual
+  struct apply
   {
     typedef EmptyType Next;
     typedef EmptyType Policy;
   };
 };
 
+template<class ACTUAL, class TYPE_LIST>
+struct PolicyChain
+{
+  typedef PolicyChainImpl<TYPE_LIST>::apply<ACTUAL> Helper;
+  typedef typename Helper::Policy Policy;
+  typedef Helper::Next Next;
+};
+
 /////////////////////////////////////////////////////////////////////////////
 // Testing Stuff
 
-template<class ACTUAL, class BASE>
-struct UpperPolicyImpl : public BASE
-{
-  void upperGo()
-  {
-    ACTUAL * t = (ACTUAL *) this;
-    t->UpperMethod();
-    t->LowerType::shadow();
-  }
-  
-  void shadow()
-  {
-    cout << "Upper Shadow" << endl;
-  }
-};
-
 struct UpperPolicy
 {
-  typedef UpperPolicy Identity;
-  typedef EmptyType Params;
-};
+  typedef NullType Inherit;
+  typedef NullType Chain;
 
-template<>
-struct Specialize<UpperPolicy>
-{
-  template<class PARAMS, class ACTUAL, class BASE>
-  struct Params
+  template<class ACTUAL, class BASE>
+  struct Policy : public BASE
   {
-    typedef UpperPolicyImpl<ACTUAL, BASE> Result;
+    void upperGo()
+    {
+      ACTUAL * t = (ACTUAL *) this;
+      t->UpperMethod();
+      t->LowerType::shadow();
+    }
+    
+    void shadow()
+    {
+      cout << "Upper Shadow" << endl;
+    }
   };
 };
 
-template<class ACTUAL, class BASE>
-struct LowerPolicyImpl : public BASE
+struct MiddlePolicy
 {
-  void lowerGo()
-  {
-    ACTUAL * t = (ACTUAL *) this;
-    cout << "Lower: My BASE is " << typeid(BASE).name() << endl;
-    t->LowerMethod();
-  }
+  typedef NullType Inherit;
+  typedef NullType Chain;
   
-  void shadow()
+  template<class ACTUAL, class BASE>
+  struct Policy : public BASE
   {
-    cout << "Lower Shadow" << endl;
-  }
+    void middleGo()
+    {
+      cout << "Hello from middle policy" << endl;
+    };  
+  };
 };
 
 struct LowerPolicy
 {
-  typedef LowerPolicy Identity;
-  typedef EmptyType Params;
-};
+  typedef NullType Inherit;
+  typedef NullType Chain;
 
-template<>
-struct Specialize<LowerPolicy>
-{
-  template<class PARAMS, class ACTUAL, class BASE>
-  struct Params
+  template<class ACTUAL, class BASE>
+  struct Policy : public BASE
   {
-    typedef LowerPolicyImpl<ACTUAL, BASE> Result;
+    void lowerGo()
+    {
+      ACTUAL * t = (ACTUAL *) this;
+      cout << "Lower: My BASE is " << typeid(BASE).name() << endl;
+      t->LowerMethod();
+    }
+    
+    void shadow()
+    {
+      cout << "Lower Shadow" << endl;
+    }
   };
 };
 
-
-template<class ACTUAL, class TYPE_LIST>
-struct FriendlyPolicyHelper
-{
-  typedef PolicyHelper<TYPE_LIST>::Actual<ACTUAL> Helper;
-  //typedef typename Helper::Policy Policy;
-  typedef GetP<Helper>::Result Policy;
-
-  //typedef Helper::Next Next;
-  typedef GetN<Helper>::Result Next;
-};
-
-
+/////////////////////////////////////////////////////////////////////////////
+// More Testing Stuff
 
 template<class UPPER_POLICY, class LOWER_POLICY>
 struct PolicyClass : public 
-  FriendlyPolicyHelper
+  PolicyChain
   <
     PolicyClass<UPPER_POLICY, LOWER_POLICY>,
     TypeList< UPPER_POLICY, TypeList<LOWER_POLICY, NullType> >
   >::Policy
 {
   typedef
-    FriendlyPolicyHelper
+    PolicyChain
     <
       PolicyClass<UPPER_POLICY, LOWER_POLICY>,
       TypeList< UPPER_POLICY, TypeList<LOWER_POLICY, NullType> >
     >::Helper Helper;
   
-  
-  //typedef Helper::Policy UpperType;
-  typedef GetP<Helper>::Result UpperType;
-
-  //typedef Helper::Next::Policy LowerType;
-  typedef GetP<GetN<Helper>::Result>::Result LowerType;
+  typedef Helper::Policy UpperType;
+  typedef Helper::Next::Policy LowerType;
 
   void UpperMethod()
   {
@@ -289,10 +209,18 @@ struct PolicyClass : public
   }
 };
 
-*/
-/*
+
 int main()
 {
+  typedef List<int, List<char, NullType> > List1;
+  typedef List<double, List< float, NullType> > List2;
+  typedef Append<List1, List2>::type Result;
+  
+  cout << "Result is: " << typeid(Result).name() << endl;
+  
+  return 0;
+  
+  
   typedef PolicyClass<UpperPolicy, LowerPolicy> P;
 
   P p;
@@ -308,6 +236,4 @@ int main()
 
   return 0;
 }
-
-*/
 
