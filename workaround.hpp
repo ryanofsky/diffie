@@ -194,5 +194,18 @@ struct TGET_class_3apply
 #define TGET_3apply(T, A, B, C) T::template apply< A,B,C >
 #endif
 
+#ifdef MSVC6
+
+template<typename T>
+struct WORKAROUND_class_InheritFrom : public T
+{};
+
+#define WORKAROUND_InheritFrom(x) WORKAROUND_class_InheritFrom<x>
+
+#else 
+
+#define WORKAROUND_InheritFrom(x) x
+
+#endif
 
 #endif
