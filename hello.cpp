@@ -51,13 +51,20 @@ struct UpperPolicyImpl : public BASE
   {
     ACTUAL * t = (ACTUAL *) this;
     t->UpperMethod();
-    t->LowerPolicy::shadow();
+    t->LowerType::shadow();
   }
   
   void shadow()
   {
     cout << "Upper Shadow" << endl;
   }
+  
+  void crawl()
+  {
+    typedef BASE Parent;
+    cout << __FILE__ << ":" << __LINE__ << " " << typeid(Parent).name() << endl;
+    Parent::crawl();
+  }  
 };
 
 struct UpperPolicy
@@ -79,7 +86,14 @@ struct LowerPolicyImpl : public BASE
   void shadow()
   {
     cout << "Lower Shadow" << endl;
-  }  
+  }
+  
+  void crawl56()
+  {
+    typedef BASE Parent;
+    cout << __FILE__ << ":" << __LINE__ << " " << typeid(Parent).name() << endl;
+    Parent::crawl();
+  }
 };
 
 struct LowerPolicy
@@ -126,41 +140,74 @@ struct FriendlySpec
   typedef Specialize<typename POLICY::Identity>::Params<typename POLICY::Params, ACTUAL, BASE>::Result Result;
 };
 
+template<class ACTUAL, class TYPE_LIST>
+struct PolicyHelper;
+
+template<class TYPE_LIST>
+struct PolicyHelpImpl
+{
+  template<class ACTUAL>
+  struct Actual
+  {
+    typedef PolicyHelper<ACTUAL, typename TYPE_LIST::Tail> Next;
+    typedef FriendlySpec<typename TYPE_LIST::Head, ACTUAL, Next >::Result Policy;
+  };
+};
+
+template<>
+struct PolicyHelpImpl<NullType>
+{
+  template<class ACTUAL>
+  struct Actual
+  {
+    typedef EmptyType Policy;
+    typedef EmptyType Next;
+  };
+};
+
+template<class ACTUAL, class TYPE_LIST>
+struct FriendlyPolicyHelpImpl
+{
+  typedef PolicyHelpImpl<TYPE_LIST> a1;
+  typedef a1::Actual<ACTUAL> a2;
+  typedef a2::Policy Result;
+};
+
+template<class ACTUAL, class TYPE_LIST>
+struct PolicyHelper : FriendlyPolicyHelpImpl<ACTUAL, TYPE_LIST>::Result
+{
+  typedef PolicyHelpImpl<TYPE_LIST>::Actual<ACTUAL> Impl;
+  typedef Impl::Policy Policy;
+  typedef Impl::Next Next;
+
+  void crawl()
+  {
+    typedef Policy Parent;
+    cout << __FILE__ << ":" << __LINE__ << " " << typeid(Parent).name() << endl;
+    //this->crawl56();    
+  
+  }
+};
+
 template<class UPPER_POLICY, class LOWER_POLICY>
 struct PolicyClass : 
   public 
-
-    FriendlySpec
+    PolicyHelper
     <
-      LOWER_POLICY,
       PolicyClass<UPPER_POLICY, LOWER_POLICY>,
-      FriendlySpec
-      <
-        UPPER_POLICY,     
-        PolicyClass<UPPER_POLICY, LOWER_POLICY>,
-        Base
-      >::Result
-    >::Result
+      TypeList< UPPER_POLICY, TypeList<LOWER_POLICY, NullType> >
+    >
 {
   typedef
-    FriendlySpec
+    PolicyHelper
     <
-      UPPER_POLICY,  
       PolicyClass<UPPER_POLICY, LOWER_POLICY>,
-      Base
-    >::Result
-    UpperPolicy;
+      TypeList< UPPER_POLICY, TypeList<LOWER_POLICY, NullType> >
+    > Helper;
 
-  typedef FriendlySpec
-    <
-      LOWER_POLICY,
-      PolicyClass<UPPER_POLICY, LOWER_POLICY>,
-      UpperPolicy
-    >::Result
-    LowerPolicy;
+  typedef Helper::Policy UpperType;
+  typedef Helper::Next::Policy LowerType;
     
-  //typedef UpperPolicy;
-  
   void UpperMethod()
   {
     cout << "Hello from PolicyClass for UpperPolicy" << endl;
@@ -170,20 +217,31 @@ struct PolicyClass :
   {
     cout << "Hello from PolicyClass for LowerPolicy" << endl;
   }
+  
+  void crawl()
+  {
+    typedef UpperType Parent;
+    cout << __FILE__ << ":" << __LINE__ << " " << typeid(Parent).name() << endl;
+    Parent::crawl();
+  };
 };
 
 int main()
 {
   typedef PolicyClass<UpperPolicy, LowerPolicy> P;
   P p;
+
+  p.crawl();
   
-  p.UpperPolicy::shadow();
-  p.LowerPolicy::shadow();
+  cout << "********************************************" << endl << endl
+       << typeid(P::UpperType).name() << endl;
+
+  p.UpperType::shadow();
+  p.LowerType::shadow();
   
   
   
   p.upperGo();
-  p.baseGo();
   p.lowerGo();
   
 /*
