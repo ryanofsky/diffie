@@ -127,7 +127,7 @@ struct InheritFrom<NullType>
 };
 
 template<class INHERIT>
-struct TopType //: public InheritFromImpl<INHERIT>::type
+struct TopType : public InheritFrom<INHERIT>::type
 {
   void topGo()
   {
@@ -135,7 +135,7 @@ struct TopType //: public InheritFromImpl<INHERIT>::type
          << typeid(INHERIT).name() << endl;
          
     cout << "TOP: Here's the class that was inherited "
-         << typeid(InheritFromImpl<INHERIT>::type).name() << endl;         
+         << typeid(InheritFrom<INHERIT>::type).name() << endl;         
   };
 };
 
