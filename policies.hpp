@@ -1,20 +1,7 @@
 #ifndef policies_hpp
 #define policies_hpp
 
-// some primitives
-struct Unspecified;
-struct EmptyBase {};
-struct NullType;
-struct True;
-struct False;
-
-// 5 most brilliant lines of C++ code ever :), the typelist declaration
-template<typename HEAD, typename TAIL>
-struct List
-{
-  typedef HEAD Head;
-  typedef TAIL Tail;
-};
+#include "general.hpp"
 
 // utility struct used to specify different ACTUAL and BASE parameters
 // for a chainable struct. Each chainable struct, will provide
@@ -54,30 +41,35 @@ template<typename ACTUAL, typename LIST, typename TERMINAL_BASE>
 struct MagicBrains
 {
 private:
-  typedef LIST::Head::Params abc123;
-  typedef LIST::Tail ltail;
-  
-  template<typename TAIL>
-  struct Huh
-  {
-    typedef typename Specify<LIST::Head::Identity>::Args<abc123 , ACTUAL, Magic<ACTUAL, ltail, TERMINAL_BASE> >::Result
-    Result;
+  typedef typename LIST::Head::Params abc123;
+  typedef typename LIST::Tail ltail;
 
+  template<typename MAGIC_BASE>
+  struct Spec
+  {
+    typedef typename Specify<typename LIST::Head::Identity>::Args<typename LIST::Head::Params, ACTUAL, MAGIC_BASE >::Result Result;
   };
 
   // is this the end of the list? (no)
-  template<typename TAIL>
-  struct Tail : public Huh<TAIL>::Result
+  template<typename TAIL CPP_FORCE_PARTIAL_TARG>
+  struct Tail : public Spec< Magic<ACTUAL, ltail, TERMINAL_BASE> >::Result
   {
+    typedef Magic<ACTUAL, ltail, TERMINAL_BASE> magic;
+    //XXX: gcc says Spec is not a template class?
+    ////typedef Spec< magic >::Result Policy;
+    typedef typename magic::TheTail Next;
   };
  
   // is this the end of the list? (yes)
-  template<>
-  struct Tail<NullType> : public Specify<LIST::Head::Identity>::Args< LIST::Head::Params, ACTUAL, NoMagic<TERMINAL_BASE> >::Result
+  template<CPP_FORCE_PARTIAL>
+  struct Tail<NullType CPP_FORCE_PARTIAL_ARG> : public Spec< NoMagic<TERMINAL_BASE> >::Result
   {
+    typedef NoMagic<TERMINAL_BASE> magic;
+    //xxx: typedef Spec< magic >::Result Policy;
+    typedef NullType Next;
   };
 
-  typedef Tail<LIST::TAIL> Result;
+  typedef Tail<typename LIST::TAIL> Result;
 };
 
 template<typename ACTUAL, typename LIST, typename TERMINAL_BASE = EmptyBase>
@@ -87,6 +79,9 @@ struct Magic : public MagicBrains<ACTUAL, LIST, TERMINAL_BASE>::Result
   typedef TERMINAL_BASE TerminalBase;
   typedef ACTUAL Actual;
   typedef LIST List;
+  typedef MagicBrains<ACTUAL, LIST, TERMINAL_BASE>::Result TheTail;
+  typedef typename TheTail::Next Next;
+  typedef typename TheTail::Policy Policy;
 };
 
 template<typename TERMINAL_BASE>
@@ -94,6 +89,9 @@ struct NoMagic : public TERMINAL_BASE
 {
   typedef False IsMagic;
   typedef TERMINAL_BASE TerminalBase;
+  typedef NullType TheTail;
+  typedef NullType Next;
+  typedef NullType Policy;
 };
 
 template<typename MAGIC, typename TERMINAL_BASE>
@@ -103,32 +101,34 @@ struct DoubleInheritBrains
 private:
 
   // MAGIC == struct Magic
-  template<typename IS_MAGIC>
+  template<typename IS_MAGIC CPP_FORCE_PARTIAL_TARG>
   struct IsMagic
   {
     // MAGIC's TerminalBase is not empty, multiple inheritance is needed
-    template<typename MAGIC_BASE>
+    template<typename MAGIC_BASE CPP_FORCE_PARTIAL_TARG1>
     struct MagicBase
     {
-      struct Result : public Magic<MAGIC::Actual, MAGIC::List, TERMINAL_BASE>, public MAGIC_BASE
+      struct Result : public Magic<typename MAGIC::Actual, typename MAGIC::List, TERMINAL_BASE>, public MAGIC_BASE
       {};
     };
 
     // MAGIC's TerminalBase is empty, so replace it with an actual TERMINAL_BASE
-    template<>
-    struct MagicBase<EmptyBase> 
+    template<CPP_FORCE_PARTIAL1>
+    struct MagicBase<EmptyBase CPP_FORCE_PARTIAL_ARG1> 
     {
-      struct Result : public Magic<MAGIC::Actual, MAGIC::List, TERMINAL_BASE>
-      {};
+      struct Result : public Magic<typename MAGIC::Actual, typename MAGIC::List, TERMINAL_BASE>
+      {
+        
+      };
     };
   };
 
   // MAGIC == struct NoMagic
-  template<>
-  struct IsMagic<False>
+  template<CPP_FORCE_PARTIAL>
+  struct IsMagic<False CPP_FORCE_PARTIAL_ARG>
   {
     // MAGIC's TerminalBase is not empty, multiple inheritance is needed
-    template<typename MAGIC_BASE>
+    template<typename MAGIC_BASE CPP_FORCE_PARTIAL_TARG1>
     struct MagicBase
     {
       struct Result : public MAGIC, public TERMINAL_BASE
@@ -136,8 +136,8 @@ private:
     };
 
     // MAGIC's TerminalBase is empty, so just inherit TERMINAL_BASE
-    template<>
-    struct MagicBase<EmptyBase>
+    template<CPP_FORCE_PARTIAL1>
+    struct MagicBase<EmptyBase CPP_FORCE_PARTIAL_ARG1>
     {
       struct Result : public TERMINAL_BASE
       {};
@@ -146,7 +146,7 @@ private:
 
 public:
 
-  typedef IsMagic<MAGIC::IsMagic> Result;
+  typedef IsMagic<typename MAGIC::IsMagic> Result;
 };
 
 template<typename MAGIC, typename TERMINAL_BASE>
