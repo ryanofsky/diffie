@@ -18,7 +18,7 @@
 //               on the chain. The TYPE_LIST must consist of policy
 //               classes only. All policy classes will have inner
 //               templated classes that look like:
-//                 
+//
 //                 template<class ACTUAL, class BASE>
 //                 struct Policy : public BASE
 //                 {
@@ -29,8 +29,8 @@
 // Pseudocode:
 // if (TYPE_LIST == NullType)
 // {
-//   NextList = PolicyChainImpl<TYPE_LIST::Tail, ACTUAL>;
-//   Policy = TYPE_LIST::Head::apply<ACTUAL, Next::Head>;
+//   NextList = PolicyChainImpl<TYPE_LIST::next, ACTUAL>;
+//   Policy = TYPE_LIST::item::apply<ACTUAL, Next::item>;
 //   return List<Policy, NextList>;
 // }
 // else
@@ -39,12 +39,12 @@
 
 template<class TYPE_LIST>
 struct PolicyChainImpl
-{  
+{
   template<class ACTUAL>
   struct apply
   {
-    typedef PolicyChainImpl<typename TYPE_LIST::Tail>::template apply<ACTUAL> Next;
-    typedef GetPolicy2<typename TYPE_LIST::Head, ACTUAL, typename Next::Policy>::type Policy;
+    typedef PolicyChainImpl<typename TYPE_LIST::next>::template apply<ACTUAL> Next;
+    typedef GetPolicy2<typename TYPE_LIST::item, ACTUAL, typename Next::Policy>::type Policy;
   };
 };
 
@@ -76,7 +76,7 @@ struct DoubleInherit : public A, public B
 {};
 
 //  Function:   InheritFrom<LIST>
-//  Arguments:  LIST is a type-list of classes or structs to inherit from. 
+//  Arguments:  LIST is a type-list of classes or structs to inherit from.
 //  Return:     The type returned will be an empty struct that inherits from
 //              all the types on the list. If the list is only one element
 //              long, single inheritance will be used.//
@@ -85,13 +85,13 @@ struct DoubleInherit : public A, public B
 //                if (TAIL == NULL)
 //                  return HEAD;
 //                else
-//                  return DoubleInherit<A, InheritFromList(TAIL::Head, TAIL::Tail)>
+//                  return DoubleInherit<A, InheritFromList(TAIL::item, TAIL::next)>
 //              }
-//              
+//
 //              if (LIST == NULL)
 //                return EmptyType;
 //              else
-//                return InheritFromList(LIST::Head, LIST::Tail)
+//                return InheritFromList(LIST::item, LIST::next)
 
 template<typename TAIL>
 struct InheritFromList
@@ -99,7 +99,7 @@ struct InheritFromList
   template<typename HEAD>
   struct apply
   {
-    typedef TGET_1apply(InheritFromList<typename TAIL::Tail>, typename TAIL::Head) next;
+    typedef typename TGET_1apply(InheritFromList<typename TAIL::next>, typename TAIL::item) next;
     typedef DoubleInherit<HEAD, typename next::type> type;
   };
 };
@@ -114,13 +114,13 @@ struct InheritFromList<NullType>
   };
 };
 
-template<typename LIST> 
+template<typename LIST>
 struct InheritFrom
 {
-  typedef InheritFromList<typename LIST::Tail>::template apply<typename LIST::Head>::type type;
+  typedef typename InheritFromList<typename LIST::next>::template apply<typename LIST::item>::type type;
 };
 
-template<> 
+template<>
 struct InheritFrom<NullType>
 {
   typedef EmptyType type;
@@ -133,9 +133,9 @@ struct TopType : public InheritFrom<INHERIT>::type
   {
     cout << "TOP: Here's the list of classes that will be inherited "
          << typeid(INHERIT).name() << endl;
-         
+
     cout << "TOP: Here's the class that was inherited "
-         << typeid(InheritFrom<INHERIT>::type).name() << endl;         
+         << typeid(typename InheritFrom<INHERIT>::type).name() << endl;
   };
 };
 
@@ -148,7 +148,7 @@ struct TopType<NullType>
   };
 };
 
-// 
+//
 //  Function:   PolicyChainImpl<POLICIES, ACTUAL, EMBEDDED_POLICIES = NullType, INHERITS = NullType>
 //  Arguments:  POLICIES is a type-list of policy classes, ACTUAL is the
 //              the type of the composite object. The function generates an
@@ -167,22 +167,22 @@ struct TopType<NullType>
 //
 // if (POLICIES != NullType)
 // { /* 1 */
-//   policy = POLICIES::Head;
+//   policy = POLICIES::item;
 //
-//   next = 
+//   next =
 //     PolicyChainImpl
-//     < POLICIES::Tail,
+//     < POLICIES::next,
 //       ACTUAL,
 //       List<policy:Policies, EMBEDDED_POLICIES>,
 //       Append<policy::Inherits, INHERITS>::type
 //     >;
-//   
+//
 //   // instantiate policy
-//   object = policy::apply<ACTUAL, next::Chain::Head, next::EmbeddedChain::Head>;
-//   
+//   object = policy::apply<ACTUAL, next::Chain::item, next::EmbeddedChain::item>;
+//
 //   // return values
 //   Chain = List<object, next::Chain>;
-//   EmbeddedChain = next::EmbeddedChain::Tail;
+//   EmbeddedChain = next::EmbeddedChain::next;
 // }
 // else
 // { /* 2 */
@@ -193,12 +193,12 @@ struct TopType<NullType>
 //   }
 //   else
 //   { /* 4 */
-//     next = 
+//     next =
 //       PolicyChainImpl
 //       <
-//         EMBEDDED_POLICIES::Head,
+//         EMBEDDED_POLICIES::item,
 //         ACTUAL,
-//         EMBEDDED_POLICIES::Tail,
+//         EMBEDDED_POLICIES::next,
 //         INHERITS
 //       >;
 //
@@ -214,27 +214,27 @@ struct PolicyChainImpl /* 1 */
    template<class ACTUAL, class EMBEDDED_POLICIES, class INHERITS>
    struct apply
    {
-     typedef typename POLICIES::Head policy;
+     typedef typename POLICIES::item policy;
      typedef List<typename policy::Policies, EMBEDDED_POLICIES> nextEmbeddedPolicies;
-     typedef Append<typename policy::Inherits, INHERITS>::type nextInherits;
-     typedef TGET_3apply
-       ( PolicyChainImpl<typename POLICIES::Tail>,
+     typedef typename Append<typename policy::Inherits, INHERITS>::type nextInherits;
+     typedef typename TGET_3apply
+       ( PolicyChainImpl<typename POLICIES::next>,
          ACTUAL,
-         nextEmbeddedPolicies, 
+         nextEmbeddedPolicies,
          nextInherits
        ) next;
 
      // instantiate policy
 
-     typedef TGET_3Policy(
+     typedef typename TGET_3Policy(
        policy,
        ACTUAL,
-       typename TGET_Head(next::Chain),
-       typename TGET_Head(next::EmbeddedChain)
+       typename TGET_item(next::Chain),
+       typename TGET_item(next::EmbeddedChain)
      ) object;
      // return values
      typedef List<object, typename next::Chain> Chain;
-     typedef typename TGET_Tail(next::EmbeddedChain) EmbeddedChain;
+     typedef typename TGET_next(next::EmbeddedChain) EmbeddedChain;
    };
 };
 
@@ -244,11 +244,11 @@ struct PolicyChainImplEnd /* 4 */
   template<class ACTUAL, class INHERITS>
   struct apply
   {
-    typedef PolicyChainImpl
-      < typename EMBEDDED_POLICIES::Head  /* POLICIES */
-      >::apply
+    typedef typename PolicyChainImpl
+      < typename EMBEDDED_POLICIES::item  /* POLICIES */
+      >::template apply
       < ACTUAL,                           /* ACTUAL */
-        typename EMBEDDED_POLICIES::Tail, /* EMBEDDED_POLICIES */
+        typename EMBEDDED_POLICIES::next, /* EMBEDDED_POLICIES */
         INHERITS                          /* INHERITS */
       > next;
 
@@ -265,7 +265,7 @@ struct PolicyChainImplEnd<NullType> /* 3 */
   struct apply
   {
      typedef List<TopType<INHERITS>, NullType> Chain;
-     typedef List<NullType, NullType> EmbeddedChain; // 1-list containing a zero list    
+     typedef List<NullType, NullType> EmbeddedChain; // 1-list containing a zero list
   };
 };
 
@@ -275,17 +275,17 @@ struct PolicyChainImpl<NullType> /* 2 */
   template<class ACTUAL, class EMBEDDED_POLICIES, class INHERITS>
   struct apply
   {
-    typedef PolicyChainImplEnd
+    typedef typename PolicyChainImplEnd
       < EMBEDDED_POLICIES        /* EMBEDDED_POLICIES */
-      >::apply
+      >::template apply
       < ACTUAL,                  /* ACTUAL */
         INHERITS                 /* INHERITS */
       > next;
-    typedef TGET_Chain(next) Chain;
-    typedef TGET_EmbeddedChain(next) EmbeddedChain;
+    typedef typename TGET_Chain(next) Chain;
+    typedef typename TGET_EmbeddedChain(next) EmbeddedChain;
   };
 };
 
-#endif             
+#endif
 
 #endif

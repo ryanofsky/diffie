@@ -1,14 +1,18 @@
 #ifndef general_hpp
 #define general_hpp
 
-struct NullType;
+#include <boost/mpl/list.hpp>
+
 struct EmptyType{};
 
-template<class HEAD, class TAIL>
-struct List
-{
-  typedef HEAD Head;
-  typedef TAIL Tail;
-};
+typedef boost::mpl::null_node NullType;
+
+template< typename HEAD, typename TAIL > 
+struct List : public boost::mpl::list_node
+  < typename BOOST_MPL_AUX_NEXT(TAIL::size)
+  , HEAD
+  , TAIL
+  > 
+{};
 
 #endif 

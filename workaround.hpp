@@ -17,8 +17,8 @@ struct TGET_never_true
 #ifndef MSVC6
 
 #define TGET_type(x) x::type
-#define TGET_Head(x) x::Head
-#define TGET_Tail(x) x::Tail
+#define TGET_item(x) x::item
+#define TGET_next(x) x::next
 #define TGET_Chain(x) x::Chain
 #define TGET_EmbeddedChain(x) x::EmbeddedChain
 #define TGET_3Policy(x,A,B,C) x::template Policy< A,B,C >
@@ -26,8 +26,8 @@ struct TGET_never_true
 #else
 
 #define TGET_type(x) TGET_class_type< x >::type
-#define TGET_Head(x) TGET_class_Head< x >::type
-#define TGET_Tail(x) TGET_class_Tail< x >::type
+#define TGET_item(x) TGET_class_item< x >::type
+#define TGET_next(x) TGET_class_next< x >::type
 #define TGET_Chain(x) TGET_class_Chain< x >::type
 #define TGET_EmbeddedChain(x) TGET_class_EmbeddedChain< x >::type
 
@@ -56,49 +56,49 @@ struct TGET_class_type<NullType>
 };
 
 template<class T>
-struct TGET_class_Head
+struct TGET_class_item
 {
-  typedef T::Head type;
+  typedef T::item type;
 };
 
 template<>
-struct TGET_class_Head<int>
-{
-  typedef EmptyType type;
-};
-
-template<>
-struct TGET_class_Head<EmptyType>
+struct TGET_class_item<int>
 {
   typedef EmptyType type;
 };
 
 template<>
-struct TGET_class_Head<NullType>
+struct TGET_class_item<EmptyType>
+{
+  typedef EmptyType type;
+};
+
+template<>
+struct TGET_class_item<NullType>
 {
   typedef EmptyType type;
 };
 
 template<class T>
-struct TGET_class_Tail
+struct TGET_class_next
 {
-  typedef T::Tail type;
+  typedef T::next type;
 };
 
 template<>
-struct TGET_class_Tail<int>
-{
-  typedef EmptyType type;
-};
-
-template<>
-struct TGET_class_Tail<EmptyType>
+struct TGET_class_next<int>
 {
   typedef EmptyType type;
 };
 
 template<>
-struct TGET_class_Tail<NullType>
+struct TGET_class_next<EmptyType>
+{
+  typedef EmptyType type;
+};
+
+template<>
+struct TGET_class_next<NullType>
 {
   typedef EmptyType type;
 };
