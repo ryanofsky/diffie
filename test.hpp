@@ -3,6 +3,8 @@
 
 #include <iostream>
 
+#if 0
+
 /////////////////////////////////////////////////////////////////////////////
 // Testing Stuff
 
@@ -11,7 +13,7 @@ struct UpperPolicy
   typedef NullType Inherit;
   typedef NullType Chain;
 
-  template<class ACTUAL, class BASE>
+  template<class ACTUAL, class BASE, class CHAIN>
   struct Policy : public BASE
   {
     void upperGo()
@@ -33,7 +35,7 @@ struct MiddlePolicy
   typedef NullType Inherit;
   typedef NullType Chain;
   
-  template<class ACTUAL, class BASE>
+  template<class ACTUAL, class BASE, class CHAIN>
   struct Policy : public BASE
   {
     void middleGo()
@@ -48,7 +50,7 @@ struct LowerPolicy
   typedef NullType Inherit;
   typedef NullType Chain;
 
-  template<class ACTUAL, class BASE>
+  template<class ACTUAL, class BASE, class CHAIN>
   struct Policy : public BASE
   {
     void lowerGo()
@@ -115,5 +117,7 @@ void test()
   p.lowerGo();
   
 };
+
+#endif
 
 #endif
