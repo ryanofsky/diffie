@@ -7,7 +7,11 @@ using namespace std;
 
 #include "typelist.hpp"
 #include "policy.hpp"
-#include "dhaes.hpp"
+
+#include "SmartResource.hpp"
+#include "ownership.hpp"
+
+//#include "dhaes.hpp"
 
 int main()
 {
